@@ -6,6 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+#This is the data loading chunk 
 library(gjam)
 bioandcatch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_all.csv")
 bioandcatch[bioandcatch == -9999] <- NA
