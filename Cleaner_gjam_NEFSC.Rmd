@@ -19,16 +19,50 @@ library(naniar) #replace with NA
 bioandcatch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_all.csv")
 bio <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_orig.csv")
 added_vars <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_added_vars.csv")
+added_vars <- added_vars[-16616,]
 
 bio_select <- bio %>% 
-  select(haulid, station, stratum, year, season, lat, lon, datetime, depth, stemp, ssalin, btemp, bsalin, cnt, spp)
+  select(haulid, station, stratum, year, season, lat, lon, datetime, depth, stemp, ssalin, btemp, bsalin, cnt, spp) %>% 
+  mutate(ssalin = na_if(ssalin, 99.999))
 
 #this command makes it so every species is a column and the values are the count of each species. This is super helpful so I don't have to use vlookup in excel.
 bio_select <- bio_select %>%
-  separate_rows()
-  mutate(INDEX = haulid) %>% 
-  group_by(spp, ID) %>% 
-  spread(spp, cnt)
+  separate(haulid, into=c("ID1", "ID2", "ID3")) %>% 
+  unite(ID1, ID2, ID3, col="ID", sep="") 
+
+bio_select <- bio_select %>% 
+  group_by_at(vars(-cnt)) %>%  # group by everything other than the value column. 
+  mutate(row_id=1:n()) %>% ungroup() %>%  # build group index
+  spread(key=spp, value=cnt)   # spread
+  
+y_bio_select <- bio_select %>% 
+  group_by(ID) %>% 
+  select(-station, -stratum, -season,  -datetime) %>% 
+  select(-year, -lat, -lon, -depth, -ssalin, -stemp, -ssalin, -btemp, -bsalin, -row_id) %>% 
+  replace(is.na(.), 0) %>% 
+  summarise_each(funs(max)) #smooshes everything into the ID column
+#up to now we have all of the y data now need to load the xdata by ID and left join so we have the whole thing. need to add a couple of variables to added vars (season etc)
+
+#summarising some of the xdata within the original dataset NOTE_IN HERE I SHOULD SPLIT UP THE DATE_TIME THING TO GET MONTH THEN CAN ADD A COLUMN FOR SEASON
+x_bio_select <- bio_select %>% 
+  group_by(ID) %>% 
+  select(ID, station, stratum, year, lat, lon, depth, ssalin, stemp, ssalin, btemp, bsalin, row_id)  %>% 
+  summarise_each(funs(max)) #smooshes everything into the ID column
+
+x <- added_vars %>%
+  separate(haulid, into=c("ID1", "ID2", "ID3")) %>% 
+  unite(ID1, ID2, ID3, col="ID", sep="") 
+
+#joining the two 
+x_y <- x %>% 
+  left_join(y_bio_select, x, by="ID")
+
+x_y <- x_y %>%
+  left_join(x_bio_select, x_y,  by="ID")
+
+
+###checkpoint 
+#do we hav e adataset by ID with all of the x and y data as well as a dataset with just x data and just y data? 
 
 #There are some cases where salinity and bt are 0, but that should be NA
 bioandcatch <- bioandcatch %>% 
