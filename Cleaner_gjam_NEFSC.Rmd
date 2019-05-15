@@ -5,14 +5,43 @@ date: "3/30/2019"
 output: html_document
 ---
 
+```{r packages, include=FALSE}
+library(gjam)
+library(tidyr)#data manipulation
+library(dplyr) #data manipulation
+library(naniar) #replace with NA
+```
+
+
 ```{r setup, include=FALSE}
 #This is the data loading chunk 
-library(gjam)
-bioandcatch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_all.csv")
-bioandcatch[bioandcatch == -9999] <- NA
 
-ydata <- bioandcatch[,31:ncol(bioandcatch)]
-ydata[is.na(ydata)] <- 0
+bioandcatch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_all.csv")
+bio <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_orig.csv")
+added_vars <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_added_vars.csv")
+
+bio_select <- bio %>% 
+  select(haulid, station, stratum, year, season, lat, lon, datetime, depth, stemp, ssalin, btemp, bsalin, cnt, spp)
+
+#this command makes it so every species is a column and the values are the count of each species. This is super helpful so I don't have to use vlookup in excel.
+bio_select <- bio_select %>%
+  separate_rows()
+  mutate(INDEX = haulid) %>% 
+  group_by(spp, ID) %>% 
+  spread(spp, cnt)
+
+#There are some cases where salinity and bt are 0, but that should be NA
+bioandcatch <- bioandcatch %>% 
+  replace_with_na_at(.vars = c("ssalin","bsalin"), condition = ~.x==0) %>%
+  na_if("#DIV/0!")
+
+#selecting y data and x data 
+xdata <- bioandcatch %>% 
+  select( haulid, lat, lon, year,  depth, stemp, ssalin, btemp, bsalin, Date, month, day, station, stratum,  cruise,  vessel, season,  AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, SUBREGION2, BATHYMETRY, LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED)
+
+ydata <- bioandcatch %>% 
+  select(-haulid, -lat, -lon, -year, - depth, -stemp, -ssalin, -btemp, -bsalin, -Date, -month, -day, -station, -stratum, - cruise, - vessel, -season, - AMO_unsm_month, -AMO_unsm_year, -NAO_month, -NAO_year, -NAO_JFM, -SUBREGION2, -BATHYMETRY, -LPI, -SLOPE, -SBF_GRP, -SBFDEPTH, -SEDIMENT, -SBFDESED)
+
 
 xdata <- bioandcatch[,1:30]
 bioandcatch_trimmed <- cbind(ydata, xdata)
