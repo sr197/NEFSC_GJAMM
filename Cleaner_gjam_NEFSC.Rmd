@@ -12,6 +12,7 @@ library(dplyr) #data manipulation
 library(naniar) #replace with NA
 ```
 
+#Load data 
 ```{r load data}
 #okay we need to start from scratch because some of the bratt stuff was wonky (there were no species names after the letter M)
 #first I am going to load the original spring and fall data
@@ -74,88 +75,122 @@ spring <- left_join(spring_catch_select, spring_x, by="id")
 spring$season <- "spring"
 
 #combining spring and fall 
+#first lets select only the overlapping species/columns 
+cols <- intersect(colnames(spring), colnames(fall))
+total <- rbind(spring[,cols], fall[,cols])
 
+#now need to filter for the data after 1982 (this is when Batt uses it. There was a change in otter doors to allow more pelagics, and more consistent sampling of southern stratum) http://www.ices.dk/sites/pub/CM%20Doccuments/1997/Y/1997_Y33.pdf
+
+total <- total %>% 
+  filter(est_year>1981)
+
+total_latlondate <- total %>% 
+  select(id, decdeg_beglat, decdeg_beglon, est_year, est_month)
+
+write.csv(total_latlondate, file="latlondate_total.csv")
+
+```
+Now I need to go back and make a few files. The first one is the NAO/AMO file which is located in the longlatdat_total xl file. Use the index function to get the NAO/AMO values by year. 
+
+The next step is to go in and copy the long lat file to arcmap and use that and the benthic habitat poly 2 shapefile along with the IDENTITY tool to get all of the information into one. 
+
+
+
+```{r Adding external data}
+#adding AMO/NAO and habitat information 
+climate_vars <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/NAO_AMO_dat.csv")
+hab_vars <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/habitat_dat.csv")
+
+total <- rbind(spring[,cols], fall[,cols])
+total <- total %>% 
+  filter(est_year>1981)
+#remove id's where NA 
+total <- total %>% 
+  filter(!is.na(id)) 
+
+total <- total %>% 
+  filter(!is.na(beglat)) #idk why there was a spatial NA but got rid of it in the other files and here #note this is really frustrating and can't figure out that the id columns are the same so I might just do it in excel 
+#note this id is missing spatial points 
+#201204013400080000.00
+
+
+#bind them all together 
+total <- cbind(total, climate_vars, by="id")
+#okay this one works, but why doesn't it work when I do the hab vars???
+
+
+total <- cbind(total, hab_vars, by="id", all=T)
+
+#getting rid of some overlapping columns 
+total <- total[, !duplicated(colnames(total))]
+
+
+
+#trimming so just the columns we want 
+
+xdata <- total %>% 
+ select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp,
+     botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth,
+     LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon)
+#lets also add a column for sediment type 
+
+
+#too many to do like this for ydata so will just select the columns 
+ydata <- total[,7:513]
+```
+#checkpoint 
+do we have adataset by ID with all of the x and y data as well as a dataset with just x data and just y data? 
+
+
+#selecting species 
+So I could go a couple of ways here. I could follow Batt 2017 which selected a number of species, or I could go on my own and select species that are present in a lot of the trawls. I am going to do the latter first.
+
+```{r selecting species, include=FALSE}
+#splitting into x and ydata 
+
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 
 ```
 
 
-```{r setup, include=FALSE}
-#This is the data loading chunk 
+#running GJAM 
+splitting into chunks 
 
-bioandcatch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_all.csv")
-bio <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_orig.csv")
-added_vars <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/clean_neus_added_vars.csv")
-added_vars <- added_vars[-16616,]
-
-bio_select <- bio %>% 
- select(haulid, station, stratum, year, season, lat, lon, datetime, depth, stemp, ssalin, btemp, bsalin, cnt, spp) %>% 
- mutate(ssalin = na_if(ssalin, 99.999))
-
-#this command makes it so every species is a column and the values are the count of each species. This is super helpful so I don't have to use vlookup in excel.
-bio_select <- bio_select %>%
- separate(haulid, into=c("ID1", "ID2", "ID3")) %>% 
- unite(ID1, ID2, ID3, col="ID", sep="") 
-
-bio_select <- bio_select %>% 
- group_by_at(vars(-cnt)) %>% # group by everything other than the value column. 
- mutate(row_id=1:n()) %>% ungroup() %>% # build group index
- spread(key=spp, value=cnt)  # spread
- 
-y_bio_select <- bio_select %>% 
- group_by(ID) %>% 
- select(-station, -stratum, -season, -datetime) %>% 
- select(-year, -lat, -lon, -depth, -ssalin, -stemp, -ssalin, -btemp, -bsalin, -row_id) %>% 
- replace(is.na(.), 0) %>% 
- summarise_each(funs(max)) #smooshes everything into the ID column
-#up to now we have all of the y data now need to load the xdata by ID and left join so we have the whole thing. need to add a couple of variables to added vars (season etc)
-
-#summarising some of the xdata within the original dataset NOTE_IN HERE I SHOULD SPLIT UP THE DATE_TIME THING TO GET MONTH THEN CAN ADD A COLUMN FOR SEASON
-x_bio_select <- bio_select %>% 
- group_by(ID) %>% 
- select(ID, station, stratum, year, lat, lon, depth, ssalin, stemp, ssalin, btemp, bsalin, row_id,
-     datetime) %>% 
- separate(datetime, into=c("month", "day", "Year", "Time")) %>% 
- select(ID, station, stratum, month, day, year, lat, lon, depth, ssalin, stemp, ssalin, btemp,
-     bsalin) %>% 
- summarise_each(funs(max)) #smooshes everything into the ID column
-
-x <- added_vars %>%
- separate(haulid, into=c("ID1", "ID2", "ID3")) %>% 
- unite(ID1, ID2, ID3, col="ID", sep="") 
-
-#joining the two 
-x_y <- x %>% 
- left_join(y_bio_select, x, by="ID")
-
-x_y <- x_y %>%
- left_join(x_bio_select, x_y, by="ID")
-
-xdata <- x_y %>% 
- select(ID, station, stratum, month, day, year, lat, lon, depth, ssalin, stemp, ssalin, btemp,
-     bsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, SUBREGION2, BATHYMETRY,
-     LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED)
-
-ydata <- x_y %>% 
- select(-ID, -station, -stratum, -month, -day, -year, -lat, -lon, -depth, -ssalin, -stemp, -ssalin, -btemp, -bsalin, -AMO_unsm_month, -AMO_unsm_year, -NAO_month, -NAO_year, -NAO_JFM, -SUBREGION2, -BATHYMETRY, -LPI, -SLOPE, -SBF_GRP, -SBFDEPTH, -SEDIMENT, -SBFDESED, -'<NA>')
-
-###checkpoint 
-#do we have adataset by ID with all of the x and y data as well as a dataset with just x data and just y data? 
-
-bioandcatch_trimmed <- cbind(ydata, xdata)
+```{r}
+total_data <- cbind(ycommon,xdata)
 
 
-bioandcatch_trimmed <- as.data.frame(bioandcatch_trimmed)
+#first time chunk 
+total <- subset(total_data, est_year < 2000)
+ydata <- total[,1:197]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+#need to do this here to see ones that werent caught early and are caught later 
 
-#bioandcatch_trimmed$GRPSED <- as.factor(as.character(bioandcatch_trimmed$GRPSED))
-bioandcatch_trimmed$SBF_GRP <- as.factor(as.character(bioandcatch_trimmed$SBF_GRP))
+xdata <- total[,198:220]
+
+S <- ncol(ydata)
+ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
 
 
-bioandcatch_trimmed$est_year <- as.factor(bioandcatch_trimmed$year)
-bioandcatch_trimmed$AMO_unsm <- as.numeric(as.character(bioandcatch_trimmed$AMO_unsm_month))
-bioandcatch_trimmed$avgdepth <- as.numeric(bioandcatch_trimmed$depth)
-bioandcatch_trimmed$surfsalin <- as.numeric(bioandcatch_trimmed$ssalin)
-bioandcatch_trimmed$bottemp <- as.numeric(bioandcatch_trimmed$btemp)
-bioandcatch_trimmed$NAO <- as.numeric(as.character((bioandcatch_trimmed$NAO_month)))
+
+xdata <- as.data.frame(xdata)
+xdata$GRPSED <- as.factor(as.character(xdata$SEDIMENT))
+xdata$SBF_GRP <- as.factor(as.character(xdata$SBF_GRP))
+xdata$est_year <- as.factor(xdata$est_year)
+xdata$AMO_unsm <- as.numeric(as.character(xdata$AMO_unsm_year))
+xdata$avgdepth <- as.numeric(xdata$avgdepth)
+xdata$surfsalin <- as.numeric(xdata$botsalin)
+xdata$bottemp <- as.numeric(xdata$bottemp)
+xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
+
+
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year, xdata, ycommon, modelList = ml)
+save(out, file='out_82_99.Rdata')
+plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+gjamPlot(out, plotPars=plotPars)
+```
+```
 
 #"ATLANTOPANDALUS.PROPINQVUS","CANCER.PLEBEJUS", "CHACEON.QUINQUEDENS",
 #need to fix this because some things are spelled incorrectly etc 
