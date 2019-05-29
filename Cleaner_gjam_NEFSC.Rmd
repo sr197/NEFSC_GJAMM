@@ -116,8 +116,6 @@ total <- total %>%
 
 #bind them all together 
 total <- cbind(total, climate_vars, by="id")
-#okay this one works, but why doesn't it work when I do the hab vars???
-
 
 total <- cbind(total, hab_vars, by="id", all=T)
 
@@ -132,8 +130,22 @@ xdata <- total %>%
  select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp,
      botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth,
      LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon)
-#lets also add a column for sediment type 
 
+#lets also add a column for sediment type 
+xdata$SED_TYPE <- ifelse(xdata$SEDIMENT ==  '0 - 0.03 Silt/Mud', 'Silt/Mud', 
+                        ifelse(xdata$SEDIMENT ==  '0.03 - 0.17 Sand', 'Sand',
+                               ifelse(xdata$SEDIMENT ==  '0.17 - 0.35 Sand', 'Sand', 
+                                      ifelse(xdata$SEDIMENT ==  '0.35 - 0.36 Sand', 'Sand',
+                                             ifelse(xdata$SEDIMENT ==  '0.36 - 0.48 Sand', 'Sand',
+                                                    ifelse(xdata$SEDIMENT ==  '20.03 - 0.17 Sand',
+                                                           'Sand',
+                                                    ifelse(xdata$SEDIMENT ==  '0.48+ Coarse Sand to  
+                                                           Gravel','Gravel', 
+                                                           ifelse(xdata$SEDIMENT ==  '60.48+ Coarse 
+                                                                  Sand to Gravel',
+                                                                  'Gravel', NA))))))))
+xdata$SED_TYPE <- ifelse(xdata$SEDIMENT ==  '0.48+ Coarse Sand to Gravel','Gravel', ifelse(xdata$SEDIMENT ==  '60.48+ Coarse Sand to Gravel', 'Gravel', xdata$SED_TYPE))
+#weirdly have to do this in two steps, I think it doesnt like too many if else statements oh well. 
 
 #too many to do like this for ydata so will just select the columns 
 ydata <- total[,7:513]
@@ -167,16 +179,20 @@ ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 #need to do this here to see ones that werent caught early and are caught later 
 
-xdata <- total[,198:220]
+xdata <- total %>% 
+ select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp,
+     botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth,
+     LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon,
+     SED_TYPE)
 
-S <- ncol(ydata)
+S <- ncol(ycommon)
 ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
 
 
 
 xdata <- as.data.frame(xdata)
 xdata$GRPSED <- as.factor(as.character(xdata$SEDIMENT))
-xdata$SBF_GRP <- as.factor(as.character(xdata$SBF_GRP))
+xdata$SED_TYPE <- as.factor(as.character(xdata$SED_TYPE))
 xdata$est_year <- as.factor(xdata$est_year)
 xdata$AMO_unsm <- as.numeric(as.character(xdata$AMO_unsm_year))
 xdata$avgdepth <- as.numeric(xdata$avgdepth)
@@ -185,11 +201,139 @@ xdata$bottemp <- as.numeric(xdata$bottemp)
 xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
 
 
-out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year, xdata, ycommon, modelList = ml)
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE, xdata, ycommon, modelList = ml)
+
+
 save(out, file='out_82_99.Rdata')
+load('out_82_99.Rdata')
 plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
 gjamPlot(out, plotPars=plotPars)
+
+#get informative stuff and save 
+DIC_1 <- out$fit$DIC         # DIC
+rmspe_1 <- out$fit$rmspeAll    # root mean squared prediction error for all species
+rmspe_spec_1 <- out$fit$rmspeBySpec # RMSPE for each species
+
+VIF_1 <- out$inputs$designTable               # VIF for each predictor
+beta_1 <- out$parameters$betaMu                # mean beta for each species and predictor
+cred_1 <- out$parameters$betaStandXTable # credible interval for each species and predictor
+sens_1 <- out$parameters$sensTable             # sensitivity
+
+
+#lets try and get out only the significant betas 
+#need to add a column with the specnames in it because right now its just the row names 
+cred_1$names <- rownames(cred_1)
+
+cred_1_sig <- cred_1 %>% 
+  filter(sig95 == "*")
+
 ```
+
+
+#second time chunk
+```{r}
+#second time chunk 
+total <- subset(total_data, est_year > 1999)
+ydata <- total[,1:197]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+#need to do this here to see ones that werent caught early and are caught later 
+
+xdata <- total %>% 
+ select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp,
+     botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth,
+     LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon,
+     SED_TYPE)
+
+S <- ncol(ycommon)
+ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
+
+
+
+xdata <- as.data.frame(xdata)
+xdata$GRPSED <- as.factor(as.character(xdata$SEDIMENT))
+xdata$SED_TYPE <- as.factor(as.character(xdata$SED_TYPE))
+xdata$est_year <- as.factor(xdata$est_year)
+xdata$AMO_unsm <- as.numeric(as.character(xdata$AMO_unsm_year))
+xdata$avgdepth <- as.numeric(xdata$avgdepth)
+xdata$surfsalin <- as.numeric(xdata$botsalin)
+xdata$bottemp <- as.numeric(xdata$bottemp)
+xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
+
+
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE, xdata, ycommon, modelList = ml)
+
+
+save(out, file='out_99_15.Rdata')
+load('out_99_15.Rdata')
+plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+gjamPlot(out, plotPars=plotPars)
+
+#getting informative stuff 
+out$parameters$fSe
+out$fit$DIC
+gp <- gjamPlot(output = out, plotPars = plotPars)
+gp$clusterIndex
+#There are three versions, data, E, and R that correspond to plots that come out. E = environmental response, R = residual covariance
+
+DIC_2 <- out$fit$DIC         # DIC
+rmspe_2 <- out$fit$rmspeAll    # root mean squared prediction error for all species
+rmspe_spec_2 <- out$fit$rmspeBySpec # RMSPE for each species
+
+VIF_2 <- out$inputs$designTable               # VIF for each predictor
+beta_2 <- out$parameters$betaMu                # mean beta for each species and predictor
+cred_2 <- out$parameters$betaStandXTable # credible interval for each species and predictor
+sens_2 <- out$parameters$sensTable             # sensitivity
+
+#head(out$prediction$presence)        # predicted occurance for each species
+
+
+#lets try and get out only the significant betas 
+#need to add a column with the specnames in it because right now its just the row names 
+cred_2$names <- rownames(cred_2)
+
+cred_2_sig <- cred_2 %>% 
+  filter(sig95 == "*")
+```
+
+
+```{r}
+#all data
+total <- total_data
+ydata <- total[,1:197]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+#need to do this here to see ones that werent caught early and are caught later 
+
+xdata <- total %>% 
+ select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp,
+     botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth,
+     LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon,
+     SED_TYPE)
+
+S <- ncol(ycommon)
+ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
+
+
+
+xdata <- as.data.frame(xdata)
+xdata$GRPSED <- as.factor(as.character(xdata$SEDIMENT))
+xdata$SED_TYPE <- as.factor(as.character(xdata$SED_TYPE))
+xdata$est_year <- as.factor(xdata$est_year)
+xdata$AMO_unsm <- as.numeric(as.character(xdata$AMO_unsm_year))
+xdata$avgdepth <- as.numeric(xdata$avgdepth)
+xdata$surfsalin <- as.numeric(xdata$botsalin)
+xdata$bottemp <- as.numeric(xdata$bottemp)
+xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
+
+
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE, xdata, ycommon, modelList = ml)
+
+
+save(out, file='out_82_15.Rdata')
+plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+gjamPlot(out, plotPars=plotPars)
+
 ```
 
 #"ATLANTOPANDALUS.PROPINQVUS","CANCER.PLEBEJUS", "CHACEON.QUINQUEDENS",
