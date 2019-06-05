@@ -122,7 +122,8 @@ total <- cbind(total, hab_vars, by="id", all=T)
 #getting rid of some overlapping columns 
 total <- total[, !duplicated(colnames(total))]
 
-
+#replacing spaces with _ in column names 
+names(total) <- gsub(" ", "_", names(total))
 
 #trimming so just the columns we want 
 
@@ -168,7 +169,7 @@ ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 #running GJAM 
 splitting into chunks 
 
-```{r}
+```{r first time chunk}
 total_data <- cbind(ycommon,xdata)
 
 
@@ -225,13 +226,14 @@ sens_1 <- out$parameters$sensTable             # sensitivity
 cred_1$names <- rownames(cred_1)
 
 cred_1_sig <- cred_1 %>% 
-  filter(sig95 == "*")
+  filter(sig95 == "*") %>% #only keep sig values
+  filter(!grepl('intercept', names))  #remove anything that says intercept in there 
 
 ```
 
+ 
 
-#second time chunk
-```{r}
+```{r second time chunk}
 #second time chunk 
 total <- subset(total_data, est_year > 1999)
 ydata <- total[,1:197]
@@ -293,11 +295,12 @@ sens_2 <- out$parameters$sensTable             # sensitivity
 cred_2$names <- rownames(cred_2)
 
 cred_2_sig <- cred_2 %>% 
-  filter(sig95 == "*")
+  filter(sig95 == "*") %>% 
+  filter(!grepl('intercept', names))  #remove anything that says intercept in there 
 ```
 
 
-```{r}
+```{r total data}
 #all data
 total <- total_data
 ydata <- total[,1:197]
@@ -334,7 +337,237 @@ save(out, file='out_82_15.Rdata')
 plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
 gjamPlot(out, plotPars=plotPars)
 
+DIC_tot <- out$fit$DIC         # DIC
+rmspe_tot <- out$fit$rmspeAll    # root mean squared prediction error for all species
+rmspe_spec_tot <- out$fit$rmspeBySpec # RMSPE for each species
+
+VIF_tot <- out$inputs$designTable               # VIF for each predictor
+beta_tot <- out$parameters$betaMu                # mean beta for each species and predictor
+cred_tot <- out$parameters$betaStandXTable # credible interval for each species and predictor
+sens_tot <- out$parameters$sensTable             # sensitivity
+
+#head(out$prediction$presence)        # predicted occurance for each species
+
+
+#lets try and get out only the significant betas 
+#need to add a column with the specnames in it because right now its just the row names 
+cred_tot$names <- rownames(cred_tot)
+
+cred_tot_sig <- cred_tot %>% 
+  filter(sig95 == "*") %>% 
+  filter(!grepl('intercept', names))  #remove anything that says intercept in there 
 ```
+
+#checkpoint 
+make sure you have the gjams working and all of the significant betas saved into a file 
+
+#shifting env 
+
+```{r matching and shifts}
+#find matching cases 
+match <- charmatch(cred_1_sig$names, cred_2_sig$names)
+cred_1_sig <- cbind(cred_1_sig, match)
+
+#adding columns for descriptions 
+cred_1_sig$var <- ifelse(grepl("bottemp", cred_1_sig$names), "temp",
+                         ifelse(grepl("botsalin", cred_1_sig$names), "sal", 
+                                ifelse(grepl("avgdepth", cred_1_sig$names), "depth",
+                                       ifelse(grepl("SEDTYPESilt/Mud", cred_1_sig$names), "silt/mud",
+                                               ifelse(grepl("SEDTYPESand", cred_1_sig$names), "sand",
+                                                      ifelse(grepl("AMOunsmyear", cred_1_sig$names), "AMO",
+                                                             ifelse(grepl("NAOyear", cred_1_sig$names),
+                                                                    "NAO", NA)))))))
+
+cred_1_sig$temp <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "temp", "warm", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "temp", "cool", NA))  
+
+cred_1_sig$sal <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "sal", "saline", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "sal", "nonsaline", NA)) 
+
+cred_1_sig$depth <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "depth", "deep", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "depth", "shallow", NA)) 
+
+cred_1_sig$siltmud <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "silt/mud", "silt/mud", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "silt/mud", "nosilt/mud", NA)) 
+
+cred_1_sig$sand <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "sand", "sand", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "sand", "nosand", NA))
+
+cred_1_sig$AMO <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "AMO", "AMO+", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "AMO", "AMO-", NA)) 
+
+cred_1_sig$NAO <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "NAO", "NAO+", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "NAO", "NAO-", NA)) 
+
+
+#adding columns for descriptions for the second time period
+cred_2_sig$var <- ifelse(grepl("bottemp", cred_2_sig$names), "temp",
+                         ifelse(grepl("botsalin", cred_2_sig$names), "sal", 
+                                ifelse(grepl("avgdepth", cred_2_sig$names), "depth",
+                                       ifelse(grepl("SEDTYPESilt/Mud", cred_2_sig$names), "silt/mud",
+                                               ifelse(grepl("SEDTYPESand", cred_2_sig$names), "sand",
+                                                      ifelse(grepl("AMOunsmyear", cred_2_sig$names), "AMO",
+                                                             ifelse(grepl("NAOyear", cred_2_sig$names),
+                                                                    "NAO", NA)))))))
+
+cred_2_sig$temp <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "temp", "warm", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "temp", "cool", NA))  
+
+cred_2_sig$sal <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "sal", "saline", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "sal", "nonsaline", NA)) 
+
+cred_2_sig$depth <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "depth", "deep", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "depth", "shallow", NA)) 
+
+cred_2_sig$siltmud <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "silt/mud", "silt/mud", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "silt/mud", "nosilt/mud", NA)) 
+
+cred_2_sig$sand <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "sand", "sand", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "sand", "nosand", NA))
+
+cred_2_sig$AMO <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "AMO", "AMO+", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "AMO", "AMO-", NA)) 
+
+cred_2_sig$NAO <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "NAO", "NAO+", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "NAO", "NAO-", NA)) 
+
+
+
+
+#lets just compare the matching ones 
+cred_1_sig_match <- cred_1_sig %>% 
+   filter(!is.na(match)) 
+
+cred_2_sig$match <- rownames(cred_2_sig)
+
+new <- merge(cred_1_sig_match, cred_2_sig, by = "match")
+write.csv(new, file="only_matching_sig_betas.csv")
+#went into excel and highlighted the changed ones but also made column called change here is that file 
+change <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/only_matching_sig_betas_changeshown.csv")
+
+#lets get the non matching ones to help us get at question 2 below 
+cred_1_sig_nomatch <- cred_1_sig %>% 
+   filter(is.na(match)) 
+write.csv(cred_1_sig_nomatch, file="cred_1_sig_nomatch.csv")
+
+#other way around also  
+match2 <- charmatch(cred_2_sig$names, cred_1_sig$names)
+cred_2_sig <- cred_2_sig %>% 
+    select(-match) 
+cred_2_sig <- cbind(cred_2_sig, match2)
+
+cred_2_sig_nomatch <- cred_2_sig %>% 
+   filter(is.na(match2)) 
+write.csv(cred_2_sig_nomatch, file="cred_2_sig_nomatch.csv")
+```
+Okay so we could have a few things happening. 
+1. species relationship with BT could be positive in the first time period and negative in second (both significant relationships)
+  Highlighted yellow in csv file only_matching_sig_betas_changeshown.csv
+2. Species could have significant relationship with BT in first time period and that relationship isnt significant in the second. 
+  Those cases are in cred_1_sig_no match (sig in first but not second) or cred_2_sig_nomatch (sig in    second but not first). All of thr changes are in the excel file Change_total. 
+    in sigs_all sheet I have highlighted all of the species matching both cases 1 and 2 described above. 
+
+I also have to go through and see if species were not caught (or not caught enought to be included in our gjam analysis) or if the relationship with the environment just wasn't significant. doing that now by highlihgting the ones with no significance in first then something significant in second and looking at all of the gjam beta outputs . 
+
+#shifting mean centroids? 
+This is to get at if the environment is changing or if species are changing with the environment. 
+```{r load pacakges}
+install.packages("sp")
+library(sp)
+install.packages("spatialEco")
+library(spatialEco)
+install.packages("geosphere")
+library(geosphere)
+```
+this makes the dataset a spatial object
+```{r}
+total_sp <- total_data
+coordinates(total_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+
+#Lets select out the time period chunks we need. 
+total_sp_1 <- subset(total_data, est_year < 2000)
+total_sp_2 <- subset(total_data, est_year > 1999)
+
+#now make all of those spatial objects: 
+
+coordinates(total_sp_1) <- ~ decdeg_beglon + decdeg_beglat
+
+coordinates(total_sp_2) <- ~ decdeg_beglon + decdeg_beglat
+
+
+```
+
+Now we can only do this for species that were duplicated in all of them. I went back to the excel file (Change_total.xls) and got out all of the species that had significant relationships with the ENV and were duplicated in the two time periods (tab is called specnames). 
+
+```{r}
+specnames_1<-c("Alosa_aestivalis_(blueback_herring)", "Alosa_pseudoharengus_(alewife)", "Alosa_sapidissima_(American_shad)", "Amblyraja_radiata_(thorny_skate)", "Ammodytes_dubius_(northern_sand_lance)", "Anchoa_hepsetus_(striped_anchovy)", "Anchoa_mitchilli_(bay_anchovy)", "Argentina_silus_(Atlantic_argentine)", "Aspidophoroides_monopterygius_(alligatorfish)", "Atlantopandalus_propinqvus_()", "Bairdiella_chrysoura_(silver_perch)", "Brevoortia_tyrannus_(Atlantic_menhaden)", "Callinectes_sapidus_(blue_crab)", "Cancer_borealis_(Jonah_crab)", "Cancer_irroratus_(Atlantic_rock_crab)", "Caridea", "Centropristis_striata_(black_sea_bass)", "Chaceon_quinquedens_(red_deepsea_crab)", "Chlorophthalmus_agassizi_(shortnose_greeneye)", "Citharichthys_arctifrons_(Gulf_stream_flounder)", "Clupea_harengus_(Atlantic_herring)", "Crangon_septemspinosa_(sevenspine_bay_shrimp)", "Cryptacanthodes_maculatus_(wrymouth)", "Cynoscion_regalis_(weakfish)", "Dasyatis_say_(bluntnose_stingray)", "Decapterus_punctatus_(round_scad)", "Dichelopandalus_leptocerus_(bristled_longbeak)", "Dipturus_laevis_(barndoor_skate)", "Enchelyopus_cimbrius_(fourbeard_rockling)", "Etropus_microstomus_(smallmouth_flounder)", "Etrumeus_teres_(round_herring)", "Gadus_morhua_(Atlantic_cod)", "Glyptocephalus_cynoglossus_(witch_flounder)", "Helicolenus_dactylopterus_(blackbelly_rosefish)", "Hemitripterus_americanus_(sea_raven)", "Hippoglossina_oblonga_(fourspot_flounder)", "Hippoglossoides_platessoides_(American_plaice)", "Homarus_americanus_(American_lobster)", "Illex_illecebrosus_(northern_shortfin_squid)", "Lagodon_rhomboides_(pinfish)", "Larimus_fasciatus_(banded_drum)", "Leiostomus_xanthurus_(spot)", "Lepophidium_profundorum_(fawn_cusk-eel)", "Leptoclinus_maculatus_(daubed_shanny)", "Leucoraja_erinacea_(little_skate)", "Leucoraja_garmani_(rosette_skate)", "Leucoraja_ocellata_(winter_skate)", "Limanda_ferruginea_(yellowtail_flounder)", "Limulus_polyphemus_(horseshoe_crab)", "Loligo_pealeii_(longfin_squid)", "Lophius_americanus_(goosefish)", "Macrouridae", "Malacoraja_senta_(smooth_skate)", "Maurolicus_weitzmani_(Weitzmans_pearlsides)", "Melanogrammus_aeglefinus_(haddock)", "Melanostigma_atlanticum_(Atlantic_soft_pout)", "Menidia_menidia_(Atlantic_silverside)", "Menticirrhus_americanus_(southern_kingfish)")
+
+
+specnames_2 <- c("Menticirrhus_saxatilis_(northern_kingfish)", "Merluccius_albidus_(offshore_hake)", "Merluccius_bilinearis_(silver_hake)", "Micropogonias_undulatus_(Atlantic_croaker)", "Morone_saxatilis_(striped_bass)", "Mustelus_canis_(smooth_dogfish)", "Myctophidae", "Myliobatis_freminvillii_(bullnose_ray)", "Myoxocephalus_octodecemspinosus_(longhorn_sculpin)", "Opisthonema_oglinum_(Atlantic_thread_herring)", "Orthopristis_chrysoptera_(pigfish)", "Ovalipes_ocellatus_(lady_crab)", "Ovalipes_stephensoni_(coarsehand_lady_crab)", "Pandalus_borealis_(northern_shrimp)", "Pandalus_montagui_(Aesop_shrimp)", "Paralichthys_dentatus_(summer_flounder)", "Pasiphaea_multidentata_(pink_glass_shrimp)", "Penaeus", "Peprilus_triacanthus_(butterfish)", "Phycis_chesteri_(longfin_hake)", "Placopecten_magellanicus_(sea_scallop)", "Pollachius_virens_(pollock)", "Polymixia_lowei_(beardfish)", "Pomatomus_saltatrix_(bluefish)", "Prionotus_carolinus_(northern_searobin)", "Prionotus_evolans_(striped_searobin)", "Pseudopleuronectes_americanus_(winter_flounder)", "Raja_eglanteria_(clearnose_skate)", "Rhizoprionodon_terraenovae_(Atlantic_sharpnose_shark)", "Sardinella_aurita_(Spanish_sardine)", "Scomber_scombrus_(Atlantic_mackerel)", "Scophthalmus_aquosus_(windowpane)", "Sebastes_fasciatus_(Acadian_redfish)", "Selene_setapinnis_(Atlantic_moonfish)", "Sphoeroides_maculatus_(northern_puffer)", "Squalus_acanthias_(spiny_dogfish)", "Stenotomus_chrysops_(scup)", "Stephanolepis_hispida_(planehead_filefish)", "Syngnathus_fuscus_(northern_pipefish)", "Synodus_foetens_(inshore_lizardfish)", "Tautogolabrus_adspersus_(cunner)", "Trachinocephalus_myops_(snakefish)", "Trachurus_lathami_(rough_scad)", "Trichiurus_lepturus_(Atlantic_cutlassfish)", "Triglops_murrayi_(moustache_sculpin)", "Urophycis_chuss_(red_hake)", "Urophycis_regia_(spotted_hake)", "Urophycis_tenuis_(white_hake)", "Zenopsis_conchifera_(buckler_dory)", "Zoarces_americanus_(ocean_pout)")
+
+specnames <- c(specnames_1, specnames_2)
+```
+
+
+```{r weighted centroid}
+#first time chunk 
+
+spec_coords_1 <- data.frame(name=rep(0,108), x=rep(0,108), y=rep(0,108))
+for (i in 1:108) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_1, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2] 
+  spec_coords_1[i,] = c(name, xcord, ycord)
+}
+
+#For the 2nd time chunk
+
+spec_coords_2 <- data.frame(name=rep(0,108), x=rep(0,108), y=rep(0,108))
+for (i in 1:108) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_2, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2] 
+  spec_coords_2[i,] = c(name, xcord, ycord)
+}
+```
+
+```{r}
+all_specs <- cbind(spec_coords_1,spec_coords_3=2)
+
+colnames(spec_coords_1) <- c("name", "Longitude", "Latitude")
+colnames(spec_coords_2) <- c("name", "Longitude", "Latitude")
+
+spec_coords_1$Latitude <- as.numeric(spec_coords_1$Latitude)
+spec_coords_1$Longitude <- as.numeric(spec_coords_1$Longitude)
+
+spec_coords_2$Latitude <- as.numeric(spec_coords_2$Latitude)
+spec_coords_2$Longitude <- as.numeric(spec_coords_2$Longitude)
+
+```
+
+this calculates the geodesic distance between the two points
+
+```{r geodesic distance}
+
+dist_total <- as.data.frame(distGeo(spec_coords_1[2:3], spec_coords_2[2:3]))
+dist_total <- cbind(specnames, dist_total)
+dist_total <- cbind(dist_total, spec_coords_1)
+dist_total <- cbind(dist_total, spec_coords_2)
+
+write.csv(dist_total, "dist_total.csv")
+
+#lets save all of the mean centroid coordinates to map later
+write.csv(spec_coords_1, "spec_coords_1.csv")
+write.csv(spec_coords_2, "spec_coords_2.csv")
+```
+
+
+
+
+
 
 #"ATLANTOPANDALUS.PROPINQVUS","CANCER.PLEBEJUS", "CHACEON.QUINQUEDENS",
 #need to fix this because some things are spelled incorrectly etc 
