@@ -79,10 +79,10 @@ spring$season <- "spring"
 cols <- intersect(colnames(spring), colnames(fall))
 total <- rbind(spring[,cols], fall[,cols])
 
-#now need to filter for the data after 1982 (this is when Batt uses it. There was a change in otter doors to allow more pelagics, and more consistent sampling of southern stratum) http://www.ices.dk/sites/pub/CM%20Doccuments/1997/Y/1997_Y33.pdf
+#now need to filter for the data after 1984 (this is when Batt uses it. There was a change in otter doors to allow more pelagics, and more consistent sampling of southern stratum) http://www.ices.dk/sites/pub/CM%20Doccuments/1997/Y/1997_Y33.pdf
 
 total <- total %>% 
-  filter(est_year>1981)
+  filter(est_year>1984)
 
 total_latlondate <- total %>% 
   select(id, decdeg_beglat, decdeg_beglon, est_year, est_month)
@@ -103,7 +103,7 @@ hab_vars <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/habitat
 
 total <- rbind(spring[,cols], fall[,cols])
 total <- total %>% 
-  filter(est_year>1981)
+  filter(est_year>1984)
 #remove id's where NA 
 total <- total %>% 
   filter(!is.na(id)) 
@@ -115,7 +115,7 @@ total <- total %>%
 
 
 #bind them all together 
-total <- cbind(total, climate_vars, by="id")
+total <- cbind(total_2, climate_vars, by="id")
 
 total <- cbind(total, hab_vars, by="id", all=T)
 
@@ -124,6 +124,10 @@ total <- total[, !duplicated(colnames(total))]
 
 #replacing spaces with _ in column names 
 names(total) <- gsub(" ", "_", names(total))
+
+#trimming dates 
+total <- total %>% 
+  filter(est_year>1984)
 
 #trimming so just the columns we want 
 
@@ -150,6 +154,73 @@ xdata$SED_TYPE <- ifelse(xdata$SEDIMENT ==  '0.48+ Coarse Sand to Gravel','Grave
 
 #too many to do like this for ydata so will just select the columns 
 ydata <- total[,7:513]
+
+
+#adding the SD data (this was taken using 5 year and 15 year time periods, taking the SD of a moving window in ArcMap 3x3 and 10x10 to see areas that are similar to surrounding areas and those that are different)
+SD_vars <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/xdata_SD.csv")
+#longer
+SD_vars$SD3x3longsal <- ifelse(SD_vars$est_year < "2000", SD_vars$X3_82_99_l, SD_vars$X3_00_17_l)
+SD_vars$SD3x3longbt <- ifelse(SD_vars$est_year < "2000", SD_vars$X3_82_99_b, SD_vars$X3_00_17_b)
+SD_vars$SD3x3longsst <- ifelse(SD_vars$est_year < "2000", SD_vars$X3_82_99_s, SD_vars$X3_00_17_s)
+
+SD_vars$SD10x10longsal <- ifelse(SD_vars$est_year < "2000", SD_vars$X10_82_99_l, SD_vars$X10_00_17_l)
+SD_vars$SD10x10longbt <- ifelse(SD_vars$est_year < "2000", SD_vars$X10_82_99_b, SD_vars$X10_00_17_b)
+SD_vars$SD10x10longsst <- ifelse(SD_vars$est_year < "2000", SD_vars$X10_82_99_s, SD_vars$X10_00_17_s)
+#shorter 
+SD_vars$SD3x3shortsal <- ifelse(SD_vars$est_year < "1995", SD_vars$X3_92_95_l, 
+                               ifelse(SD_vars$est_year < "01" & SD_vars$est_year > "95", SD_vars$X3_96_00_l, 
+                                      ifelse(SD_vars$est_year < "07" & SD_vars$est_year > "00", SD_vars$X3_01_06_l, 
+                                             ifelse(SD_vars$est_year < "13" & SD_vars$est_year > "06", SD_vars$X3_07_12_l, 
+                                                    ifelse(SD_vars$est_year > "12", SD_vars$X3_13_18_l)
+  
+))))
+SD_vars$SD3x3shortbt <- ifelse(SD_vars$est_year < "1995", SD_vars$X3_92_95_b, 
+                               ifelse(SD_vars$est_year < "01" & SD_vars$est_year > "95", SD_vars$X3_96_00_b, 
+                                      ifelse(SD_vars$est_year < "07" & SD_vars$est_year > "00", SD_vars$X3_01_06_b, 
+                                             ifelse(SD_vars$est_year < "13" & SD_vars$est_year > "06", SD_vars$X3_07_12_b, 
+                                                    ifelse(SD_vars$est_year > "12", SD_vars$X3_13_18_b)
+  
+))))
+SD_vars$SD3x3shortsst <- ifelse(SD_vars$est_year < "1995", SD_vars$X3_92_95_s, 
+                               ifelse(SD_vars$est_year < "01" & SD_vars$est_year > "95", SD_vars$X3_96_00_s, 
+                                      ifelse(SD_vars$est_year < "07" & SD_vars$est_year > "00", SD_vars$X3_01_06_s, 
+                                             ifelse(SD_vars$est_year < "13" & SD_vars$est_year > "06", SD_vars$X3_07_12_s, 
+                                                    ifelse(SD_vars$est_year > "12", SD_vars$X3_13_18_s)
+  
+))))
+
+SD_vars$SD10x10shortsal <- ifelse(SD_vars$est_year < "1995", SD_vars$X10_92_95_l, 
+                               ifelse(SD_vars$est_year < "01" & SD_vars$est_year > "95", SD_vars$X10_96_00_l, 
+                                      ifelse(SD_vars$est_year < "07" & SD_vars$est_year > "00", SD_vars$X10_01_06_l, 
+                                             ifelse(SD_vars$est_year < "13" & SD_vars$est_year > "06", SD_vars$X10_07_12_l, 
+                                                    ifelse(SD_vars$est_year > "12", SD_vars$X10_13_18_l)
+  
+))))
+SD_vars$SD10x10shortbt <- ifelse(SD_vars$est_year < "1995", SD_vars$X10_92_95_b, 
+                               ifelse(SD_vars$est_year < "01" & SD_vars$est_year > "95", SD_vars$X10_96_00_b, 
+                                      ifelse(SD_vars$est_year < "07" & SD_vars$est_year > "00", SD_vars$X10_01_06_b, 
+                                             ifelse(SD_vars$est_year < "13" & SD_vars$est_year > "06", SD_vars$X10_07_12_b, 
+                                                    ifelse(SD_vars$est_year > "12", SD_vars$X10_13_18_b)
+  
+))))
+SD_vars$SD10x10shortsst <- ifelse(SD_vars$est_year < "1995", SD_vars$X10_92_95_s, 
+                               ifelse(SD_vars$est_year < "01" & SD_vars$est_year > "95", SD_vars$X10_96_00_s, 
+                                      ifelse(SD_vars$est_year < "07" & SD_vars$est_year > "00", SD_vars$X10_01_06_s, 
+                                             ifelse(SD_vars$est_year < "13" & SD_vars$est_year > "06", SD_vars$X10_07_12_s, 
+                                                    ifelse(SD_vars$est_year > "12", SD_vars$X10_13_18_s)
+  
+))))
+SD_vars_trim <- SD_vars[46:57]
+
+xdata <- cbind(xdata, SD_vars_trim)
+total <- cbind(ydata, xdata)
+
+#saving these files in case we mess up somewhere and need them again 
+write.csv(total, file="total.csv")
+write.csv(xdata, file="xdata.csv")
+write.csv(ydata, file="ydata.csv")
+
+
 ```
 #checkpoint 
 do we have adataset by ID with all of the x and y data as well as a dataset with just x data and just y data? 
@@ -160,8 +231,9 @@ So I could go a couple of ways here. I could follow Batt 2017 which selected a n
 
 ```{r selecting species, include=FALSE}
 #splitting into x and ydata 
-
+ydata <- total[,7:513]
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+total_data <- cbind(ycommon,xdata)
 
 ```
 
@@ -175,7 +247,7 @@ total_data <- cbind(ycommon,xdata)
 
 #first time chunk 
 total <- subset(total_data, est_year < 2000)
-ydata <- total[,1:197]
+ydata <- total[,1:193]
 ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 #need to do this here to see ones that werent caught early and are caught later 
@@ -205,9 +277,9 @@ xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
 out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE, xdata, ycommon, modelList = ml)
 
 
-save(out, file='out_82_99.Rdata')
-load('out_82_99.Rdata')
-plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+save(out, file='out_85_99.Rdata')
+load('out_85_99.Rdata')
+plotPars <- list(SMALLPLOTS = TRUE, GRIDPLOTS=T, PLOTALLY=TRUE, SAVEPLOTS=TRUE)
 gjamPlot(out, plotPars=plotPars)
 
 #get informative stuff and save 
@@ -220,6 +292,8 @@ beta_1 <- out$parameters$betaMu                # mean beta for each species and 
 cred_1 <- out$parameters$betaStandXTable # credible interval for each species and predictor
 sens_1 <- out$parameters$sensTable             # sensitivity
 
+#getting out the predictions 
+pred_1 <- out$prediction$ypredMu
 
 #lets try and get out only the significant betas 
 #need to add a column with the specnames in it because right now its just the row names 
@@ -229,6 +303,21 @@ cred_1_sig <- cred_1 %>%
   filter(sig95 == "*") %>% #only keep sig values
   filter(!grepl('intercept', names))  #remove anything that says intercept in there 
 
+gp <- gjamPlot(output = out, plotPars = plotPars)
+cluster1 <- gp$clusterIndex
+#There are three versions, data, E, and R that correspond to plots that come out. E = environmental response, R = residual covariance
+cluster1_order <- gp$clusterOrder
+#The order of species and the cluster groups to which they belong are returned in fit$clusterOrder and fit$clusterIndex.
+
+
+#trying with more clusters doesn't really work 
+load('out_82_99.Rdata')
+plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+gp <- gjamPlot(output = out, plotPars = plotPars)
+gp$clusterIndex
+gp$clusterOrder
+#The order of species and the cluster groups to which they belong are returned in fit$clusterOrder and fit$clusterIndex.
+
 ```
 
  
@@ -236,7 +325,7 @@ cred_1_sig <- cred_1 %>%
 ```{r second time chunk}
 #second time chunk 
 total <- subset(total_data, est_year > 1999)
-ydata <- total[,1:197]
+ydata <- total[,1:193]
 ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 #need to do this here to see ones that werent caught early and are caught later 
@@ -297,18 +386,27 @@ cred_2$names <- rownames(cred_2)
 cred_2_sig <- cred_2 %>% 
   filter(sig95 == "*") %>% 
   filter(!grepl('intercept', names))  #remove anything that says intercept in there 
+
+gp <- gjamPlot(output = out, plotPars = plotPars)
+cluster2 <- gp$clusterIndex
+#There are three versions, data, E, and R that correspond to plots that come out. E = environmental response, R = residual covariance
+
+
 ```
 
 
 ```{r total data}
 #all data
-total <- total_data
-ydata <- total[,1:197]
+
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+
 ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 #need to do this here to see ones that werent caught early and are caught later 
 
-xdata <- total %>% 
+xdata <- xdata %>% 
  select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp,
      botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth,
      LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon,
@@ -334,7 +432,8 @@ out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYP
 
 
 save(out, file='out_82_15.Rdata')
-plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+load('out_82_15.Rdata')
+plotPars <- list(GRIDPLOTS=T, SAVEPLOTS=T)
 gjamPlot(out, plotPars=plotPars)
 
 DIC_tot <- out$fit$DIC         # DIC
@@ -358,8 +457,209 @@ cred_tot_sig <- cred_tot %>%
   filter(!grepl('intercept', names))  #remove anything that says intercept in there 
 ```
 
+```{r total chunk with SD}
+#all data
+
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+#need to do this here to see ones that werent caught early and are caught later 
+
+xdata <- xdata %>% dplyr::select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp, botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth, LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon, SED_TYPE, SD3x3longsal, SD3x3longbt, SD3x3longsst, SD10x10longsal, SD10x10longbt, SD10x10longsst, SD3x3shortsal, SD3x3shortbt, SD3x3shortsst, SD10x10shortsal, SD10x10shortbt, SD10x10shortsst)
+
+S <- ncol(ycommon)
+ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
+
+
+xdata <- as.data.frame(xdata)
+xdata$GRPSED <- as.factor(as.character(xdata$SEDIMENT))
+xdata$SED_TYPE <- as.factor(as.character(xdata$SED_TYPE))
+xdata$est_year <- as.factor(xdata$est_year)
+xdata$AMO_unsm <- as.numeric(as.character(xdata$AMO_unsm_year))
+xdata$avgdepth <- as.numeric(xdata$avgdepth)
+xdata$surfsalin <- as.numeric(xdata$botsalin)
+xdata$bottemp <- as.numeric(xdata$bottemp)
+xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
+
+
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3longsal+ SD3x3longbt + SD3x3longsst+ SD10x10longsal + SD10x10longbt + SD10x10longsst + SD3x3shortsal+ SD3x3shortbt + SD3x3shortsst + SD10x10shortsal + SD10x10shortbt + SD10x10shortsst, xdata, ycommon, modelList = ml)
+
+
+save(out, file='out_82_15_SD.Rdata')
+load('out_82_15_SD.Rdata')
+plotPars <- list(GRIDPLOTS=T, SAVEPLOTS=T)
+gjamPlot(out, plotPars=plotPars)
+
+DIC_tot <- out$fit$DIC         # DIC
+rmspe_tot <- out$fit$rmspeAll    # root mean squared prediction error for all species
+rmspe_spec_tot <- out$fit$rmspeBySpec # RMSPE for each species
+
+VIF_tot <- out$inputs$designTable               # VIF for each predictor
+beta_tot <- out$parameters$betaMu                # mean beta for each species and predictor
+cred_tot <- out$parameters$betaStandXTable # credible interval for each species and predictor
+sens_tot <- out$parameters$sensTable             # sensitivity
+
+#head(out$prediction$presence)        # predicted occurance for each species
+
+
+#lets try and get out only the significant betas 
+#need to add a column with the specnames in it because right now its just the row names 
+cred_tot$names <- rownames(cred_tot)
+
+cred_tot_sig <- cred_tot %>% 
+  filter(sig95 == "*") %>% 
+  filter(!grepl('intercept', names))  #remove anything that says intercept in there 
+
 #checkpoint 
-make sure you have the gjams working and all of the significant betas saved into a file 
+#make sure you have the gjams working and all of the significant betas saved into a file 
+```
+
+```{r first chunk with SD}
+#first time chunk 
+total <- subset(total_data, est_year < 2000)
+ydata <- total[,1:193]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+#need to do this here to see ones that werent caught early and are caught later 
+
+xdata <- total %>% dplyr::select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp, botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth, LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon, SED_TYPE, SD3x3longsal, SD3x3longbt, SD3x3longsst, SD10x10longsal, SD10x10longbt, SD10x10longsst, SD3x3shortsal, SD3x3shortbt, SD3x3shortsst, SD10x10shortsal, SD10x10shortbt, SD10x10shortsst)
+
+S <- ncol(ycommon)
+ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
+
+
+
+xdata <- as.data.frame(xdata)
+xdata$GRPSED <- as.factor(as.character(xdata$SEDIMENT))
+xdata$SED_TYPE <- as.factor(as.character(xdata$SED_TYPE))
+xdata$est_year <- as.factor(xdata$est_year)
+xdata$AMO_unsm <- as.numeric(as.character(xdata$AMO_unsm_year))
+xdata$avgdepth <- as.numeric(xdata$avgdepth)
+xdata$surfsalin <- as.numeric(xdata$botsalin)
+xdata$bottemp <- as.numeric(xdata$bottemp)
+xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
+
+
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3longsal+ SD3x3longbt + SD3x3longsst+ SD10x10longsal + SD10x10longbt + SD10x10longsst + SD3x3shortsal+ SD3x3shortbt + SD3x3shortsst + SD10x10shortsal + SD10x10shortbt + SD10x10shortsst, xdata, ycommon, modelList = ml)
+
+save(out, file='out_85_99_SD.Rdata')
+load('out_85_99_SD.Rdata')
+plotPars <- list(SMALLPLOTS = TRUE, GRIDPLOTS=T, PLOTALLY=TRUE, SAVEPLOTS=TRUE)
+gjamPlot(out, plotPars=plotPars)
+
+#get informative stuff and save 
+DIC_1 <- out$fit$DIC         # DIC
+rmspe_1 <- out$fit$rmspeAll    # root mean squared prediction error for all species
+rmspe_spec_1 <- out$fit$rmspeBySpec # RMSPE for each species
+
+VIF_1 <- out$inputs$designTable               # VIF for each predictor
+beta_1 <- out$parameters$betaMu                # mean beta for each species and predictor
+cred_1 <- out$parameters$betaStandXTable # credible interval for each species and predictor
+sens_1 <- out$parameters$sensTable             # sensitivity
+
+#getting out the predictions 
+pred_1 <- out$prediction$ypredMu
+
+#lets try and get out only the significant betas 
+#need to add a column with the specnames in it because right now its just the row names 
+cred_1$names <- rownames(cred_1)
+
+cred_1_sig <- cred_1 %>% 
+  filter(sig95 == "*") %>% #only keep sig values
+  filter(!grepl('intercept', names))  #remove anything that says intercept in there 
+
+gp <- gjamPlot(output = out, plotPars = plotPars)
+cluster1 <- gp$clusterIndex
+#There are three versions, data, E, and R that correspond to plots that come out. E = environmental response, R = residual covariance
+cluster1_order <- gp$clusterOrder
+#The order of species and the cluster groups to which they belong are returned in fit$clusterOrder and fit$clusterIndex.
+
+
+#trying with more clusters doesn't really work 
+load('out_82_99.Rdata')
+plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+gp <- gjamPlot(output = out, plotPars = plotPars)
+gp$clusterIndex
+gp$clusterOrder
+#The order of species and the cluster groups to which they belong are returned in fit$clusterOrder and fit$clusterIndex.
+
+```
+
+
+
+
+```{r second time chunk with SD }
+#second time chunk 
+total <- subset(total_data, est_year > 1999)
+ydata <- total[,1:193]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+#need to do this here to see ones that werent caught early and are caught later 
+
+xdata <- total %>% dplyr::select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp, botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth, LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon, SED_TYPE, SD3x3longsal, SD3x3longbt, SD3x3longsst, SD10x10longsal, SD10x10longbt, SD10x10longsst, SD3x3shortsal, SD3x3shortbt, SD3x3shortsst, SD10x10shortsal, SD10x10shortbt, SD10x10shortsst)
+
+S <- ncol(ycommon)
+ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
+
+
+
+xdata <- as.data.frame(xdata)
+xdata$GRPSED <- as.factor(as.character(xdata$SEDIMENT))
+xdata$SED_TYPE <- as.factor(as.character(xdata$SED_TYPE))
+xdata$est_year <- as.factor(xdata$est_year)
+xdata$AMO_unsm <- as.numeric(as.character(xdata$AMO_unsm_year))
+xdata$avgdepth <- as.numeric(xdata$avgdepth)
+xdata$surfsalin <- as.numeric(xdata$botsalin)
+xdata$bottemp <- as.numeric(xdata$bottemp)
+xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
+
+
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3longsal+ SD3x3longbt + SD3x3longsst+ SD10x10longsal + SD10x10longbt + SD10x10longsst + SD3x3shortsal+ SD3x3shortbt + SD3x3shortsst + SD10x10shortsal + SD10x10shortbt + SD10x10shortsst, xdata, ycommon, modelList = ml)
+
+
+save(out, file='out_99_15_SD.Rdata')
+load('out_99_15_SD.Rdata')
+plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+gjamPlot(out, plotPars=plotPars)
+
+#getting informative stuff 
+out$parameters$fSe
+out$fit$DIC
+gp <- gjamPlot(output = out, plotPars = plotPars)
+gp$clusterIndex
+#There are three versions, data, E, and R that correspond to plots that come out. E = environmental response, R = residual covariance
+
+DIC_2 <- out$fit$DIC         # DIC
+rmspe_2 <- out$fit$rmspeAll    # root mean squared prediction error for all species
+rmspe_spec_2 <- out$fit$rmspeBySpec # RMSPE for each species
+
+VIF_2 <- out$inputs$designTable               # VIF for each predictor
+beta_2 <- out$parameters$betaMu                # mean beta for each species and predictor
+cred_2 <- out$parameters$betaStandXTable # credible interval for each species and predictor
+sens_2 <- out$parameters$sensTable             # sensitivity
+
+#head(out$prediction$presence)        # predicted occurance for each species
+
+
+#lets try and get out only the significant betas 
+#need to add a column with the specnames in it because right now its just the row names 
+cred_2$names <- rownames(cred_2)
+
+cred_2_sig <- cred_2 %>% 
+  filter(sig95 == "*") %>% 
+  filter(!grepl('intercept', names))  #remove anything that says intercept in there 
+
+gp <- gjamPlot(output = out, plotPars = plotPars)
+cluster2 <- gp$clusterIndex
+#There are three versions, data, E, and R that correspond to plots that come out. E = environmental response, R = residual covariance
+
+
+```
+
+
 
 #shifting env 
 
@@ -459,6 +759,39 @@ cred_2_sig <- cbind(cred_2_sig, match2)
 cred_2_sig_nomatch <- cred_2_sig %>% 
    filter(is.na(match2)) 
 write.csv(cred_2_sig_nomatch, file="cred_2_sig_nomatch.csv")
+
+
+#total data adding columns 
+cred_tot_sig$var <- ifelse(grepl("bottemp", cred_tot_sig$names), "temp",
+                         ifelse(grepl("botsalin", cred_tot_sig$names), "sal", 
+                                ifelse(grepl("avgdepth", cred_tot_sig$names), "depth",
+                                       ifelse(grepl("SEDTYPESilt/Mud", cred_tot_sig$names), "silt/mud",
+                                               ifelse(grepl("SEDTYPESand", cred_tot_sig$names), "sand",
+                                                      ifelse(grepl("AMOunsmyear", cred_tot_sig$names), "AMO",
+                                                             ifelse(grepl("NAOyear", cred_tot_sig$names),
+                                                                    "NAO", NA)))))))
+
+cred_tot_sig$temp <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "temp", "warm", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "temp", "cool", NA))  
+
+cred_tot_sig$sal <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "sal", "saline", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "sal", "nonsaline", NA)) 
+
+cred_tot_sig$depth <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "depth", "deep", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "depth", "shallow", NA)) 
+
+cred_tot_sig$siltmud <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "silt/mud", "silt/mud", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "silt/mud", "nosilt/mud", NA)) 
+
+cred_tot_sig$sand <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "sand", "sand", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "sand", "nosand", NA))
+
+cred_tot_sig$AMO <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "AMO", "AMO+", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "AMO", "AMO-", NA)) 
+
+cred_tot_sig$NAO <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "NAO", "NAO+", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "NAO", "NAO-", NA)) 
+
 ```
 Okay so we could have a few things happening. 
 1. species relationship with BT could be positive in the first time period and negative in second (both significant relationships)
@@ -468,6 +801,8 @@ Okay so we could have a few things happening.
     in sigs_all sheet I have highlighted all of the species matching both cases 1 and 2 described above. 
 
 I also have to go through and see if species were not caught (or not caught enought to be included in our gjam analysis) or if the relationship with the environment just wasn't significant. doing that now by highlihgting the ones with no significance in first then something significant in second and looking at all of the gjam beta outputs . 
+
+
 
 #shifting mean centroids? 
 This is to get at if the environment is changing or if species are changing with the environment. 
@@ -488,6 +823,9 @@ coordinates(total_sp) <- ~ decdeg_beglon + decdeg_beglat
 #Lets select out the time period chunks we need. 
 total_sp_1 <- subset(total_data, est_year < 2000)
 total_sp_2 <- subset(total_data, est_year > 1999)
+total_sp_85_90 <- subset(total_data, est_year < 1991)
+total_sp_12_17 <- subset(total_data, est_year > 2011)
+
 
 #now make all of those spatial objects: 
 
@@ -495,6 +833,9 @@ coordinates(total_sp_1) <- ~ decdeg_beglon + decdeg_beglat
 
 coordinates(total_sp_2) <- ~ decdeg_beglon + decdeg_beglat
 
+coordinates(total_sp_85_90) <- ~ decdeg_beglon + decdeg_beglat
+
+coordinates(total_sp_12_17) <- ~ decdeg_beglon + decdeg_beglat
 
 ```
 
@@ -507,6 +848,17 @@ specnames_1<-c("Alosa_aestivalis_(blueback_herring)", "Alosa_pseudoharengus_(ale
 specnames_2 <- c("Menticirrhus_saxatilis_(northern_kingfish)", "Merluccius_albidus_(offshore_hake)", "Merluccius_bilinearis_(silver_hake)", "Micropogonias_undulatus_(Atlantic_croaker)", "Morone_saxatilis_(striped_bass)", "Mustelus_canis_(smooth_dogfish)", "Myctophidae", "Myliobatis_freminvillii_(bullnose_ray)", "Myoxocephalus_octodecemspinosus_(longhorn_sculpin)", "Opisthonema_oglinum_(Atlantic_thread_herring)", "Orthopristis_chrysoptera_(pigfish)", "Ovalipes_ocellatus_(lady_crab)", "Ovalipes_stephensoni_(coarsehand_lady_crab)", "Pandalus_borealis_(northern_shrimp)", "Pandalus_montagui_(Aesop_shrimp)", "Paralichthys_dentatus_(summer_flounder)", "Pasiphaea_multidentata_(pink_glass_shrimp)", "Penaeus", "Peprilus_triacanthus_(butterfish)", "Phycis_chesteri_(longfin_hake)", "Placopecten_magellanicus_(sea_scallop)", "Pollachius_virens_(pollock)", "Polymixia_lowei_(beardfish)", "Pomatomus_saltatrix_(bluefish)", "Prionotus_carolinus_(northern_searobin)", "Prionotus_evolans_(striped_searobin)", "Pseudopleuronectes_americanus_(winter_flounder)", "Raja_eglanteria_(clearnose_skate)", "Rhizoprionodon_terraenovae_(Atlantic_sharpnose_shark)", "Sardinella_aurita_(Spanish_sardine)", "Scomber_scombrus_(Atlantic_mackerel)", "Scophthalmus_aquosus_(windowpane)", "Sebastes_fasciatus_(Acadian_redfish)", "Selene_setapinnis_(Atlantic_moonfish)", "Sphoeroides_maculatus_(northern_puffer)", "Squalus_acanthias_(spiny_dogfish)", "Stenotomus_chrysops_(scup)", "Stephanolepis_hispida_(planehead_filefish)", "Syngnathus_fuscus_(northern_pipefish)", "Synodus_foetens_(inshore_lizardfish)", "Tautogolabrus_adspersus_(cunner)", "Trachinocephalus_myops_(snakefish)", "Trachurus_lathami_(rough_scad)", "Trichiurus_lepturus_(Atlantic_cutlassfish)", "Triglops_murrayi_(moustache_sculpin)", "Urophycis_chuss_(red_hake)", "Urophycis_regia_(spotted_hake)", "Urophycis_tenuis_(white_hake)", "Zenopsis_conchifera_(buckler_dory)", "Zoarces_americanus_(ocean_pout)")
 
 specnames <- c(specnames_1, specnames_2)
+
+
+#figure this out for the 5 year chunks as well! 
+
+specnames_1<-c("Alosa_aestivalis_.blueback_herring.", "Alosa_pseudoharengus_.alewife.", "Alosa_sapidissima_.American_shad.", "Amblyraja_radiata_.thorny_skate.", "Ammodytes_dubius_.northern_sand_lance.", "Anchoa_hepsetus_.striped_anchovy.", "Anchoa_mitchilli_.bay_anchovy.", "Argentina_silus_.Atlantic_argentine.", "Aspidophoroides_monopterygius_.alligatorfish.", "Bairdiella_chrysoura_.silver_perch.", "Brevoortia_tyrannus_.Atlantic_menhaden.", "Callinectes_sapidus_.blue_crab.", "Cancer_borealis_.Jonah_crab.", "Cancer_irroratus_.Atlantic_rock_crab.", "Caridea", "Centropristis_striata_.black_sea_bass.", "Chaceon_quinquedens_.red_deepsea_crab.", "Chlorophthalmus_agassizi_.shortnose_greeneye.", "Citharichthys_arctifrons_.Gulf_stream_flounder.", "Clupea_harengus_.Atlantic_herring.", "Cryptacanthodes_maculatus_.wrymouth.", "Cynoscion_regalis_.weakfish.", "Dasyatis_say_.bluntnose_stingray.", "Decapterus_punctatus_.round_scad.", "Dipturus_laevis_.barndoor_skate.", "Enchelyopus_cimbrius_.fourbeard_rockling.", "Etropus_microstomus_.smallmouth_flounder.", "Etrumeus_teres_.round_herring.", "Gadus_morhua_.Atlantic_cod.", "Glyptocephalus_cynoglossus_.witch_flounder.", "Helicolenus_dactylopterus_.blackbelly_rosefish.", "Hemitripterus_americanus_.sea_raven.", "Hippoglossina_oblonga_.fourspot_flounder.", "Hippoglossoides_platessoides_.American_plaice.", "Homarus_americanus_.American_lobster.", "Illex_illecebrosus_.northern_shortfin_squid.", "Lagodon_rhomboides_.pinfish.", "Larimus_fasciatus_.banded_drum.", "Leiostomus_xanthurus_.spot.", "Lepophidium_profundorum_.fawn_cusk.eel.", "Leptoclinus_maculatus_.daubed_shanny.", "Leucoraja_erinacea_.little_skate.", "Leucoraja_garmani_.rosette_skate.", "Leucoraja_ocellata_.winter_skate.", "Limanda_ferruginea_.yellowtail_flounder.", "Limulus_polyphemus_.horseshoe_crab.", "Loligo_pealeii_.longfin_squid.", "Lophius_americanus_.goosefish.", "Macrouridae", "Malacoraja_senta_.smooth_skate.", "Maurolicus_weitzmani_.Weitzmans_pearlsides.", "Melanogrammus_aeglefinus_.haddock.", "Melanostigma_atlanticum_.Atlantic_soft_pout.", "Menidia_menidia_.Atlantic_silverside.", "Menticirrhus_americanus_.southern_kingfish.")
+
+
+specnames_2 <- c("Menticirrhus_saxatilis_.northern_kingfish.", "Merluccius_albidus_.offshore_hake.", "Merluccius_bilinearis_.silver_hake.", "Micropogonias_undulatus_.Atlantic_croaker.", "Morone_saxatilis_.striped_bass.", "Mustelus_canis_.smooth_dogfish.", "Myctophidae", "Myliobatis_freminvillii_.bullnose_ray.", "Myoxocephalus_octodecemspinosus_.longhorn_sculpin.", "Opisthonema_oglinum_.Atlantic_thread_herring.", "Orthopristis_chrysoptera_.pigfish.", "Ovalipes_ocellatus_.lady_crab.", "Ovalipes_stephensoni_.coarsehand_lady_crab.", "Pandalus_borealis_.northern_shrimp.", "Paralichthys_dentatus_.summer_flounder.", "Penaeus", "Peprilus_triacanthus_.butterfish.", "Phycis_chesteri_.longfin_hake.", "Placopecten_magellanicus_.sea_scallop.", "Pollachius_virens_.pollock.", "Polymixia_lowei_.beardfish.", "Pomatomus_saltatrix_.bluefish.", "Prionotus_carolinus_.northern_searobin.", "Prionotus_evolans_.striped_searobin.", "Pseudopleuronectes_americanus_.winter_flounder.", "Raja_eglanteria_.clearnose_skate.", "Rhizoprionodon_terraenovae_.Atlantic_sharpnose_shark.", "Sardinella_aurita_.Spanish_sardine.", "Scomber_scombrus_.Atlantic_mackerel.", "Scophthalmus_aquosus_.windowpane.", "Sebastes_fasciatus_.Acadian_redfish.", "Selene_setapinnis_.Atlantic_moonfish.", "Sphoeroides_maculatus_.northern_puffer.", "Squalus_acanthias_.spiny_dogfish.", "Stenotomus_chrysops_.scup.", "Stephanolepis_hispida_.planehead_filefish.", "Syngnathus_fuscus_.northern_pipefish.", "Synodus_foetens_.inshore_lizardfish.", "Tautogolabrus_adspersus_.cunner.", "Trachinocephalus_myops_.snakefish.", "Trachurus_lathami_.rough_scad.", "Trichiurus_lepturus_.Atlantic_cutlassfish.", "Triglops_murrayi_.moustache_sculpin.", "Urophycis_chuss_.red_hake.", "Urophycis_regia_.spotted_hake.", "Urophycis_tenuis_.white_hake.", "Zenopsis_conchifera_.buckler_dory.", "Zoarces_americanus_.ocean_pout.")
+specnames <- c(specnames_1, specnames_2)
+
+
 ```
 
 
@@ -532,19 +884,53 @@ for (i in 1:108) { #for each species in spec_list
   ycord <- wt.try@coords[2] 
   spec_coords_2[i,] = c(name, xcord, ycord)
 }
+
+#first 5 years 
+spec_coords_85_90 <- data.frame(name=rep(0,103), x=rep(0,103), y=rep(0,103))
+for (i in 1:103) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_85_90, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2] 
+  spec_coords_85_90[i,] = c(name, xcord, ycord)
+}
+
+#2nd 5 year chunk
+
+spec_coords_12_17 <- data.frame(name=rep(0,103), x=rep(0,103), y=rep(0,103))
+for (i in 1:103) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_12_17, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2] 
+  spec_coords_12_17[i,] = c(name, xcord, ycord)
+}
+
 ```
 
 ```{r}
-all_specs <- cbind(spec_coords_1,spec_coords_3=2)
+all_specs <- cbind(spec_coords_1,spec_coords_2)
 
-colnames(spec_coords_1) <- c("name", "Longitude", "Latitude")
-colnames(spec_coords_2) <- c("name", "Longitude", "Latitude")
+colnames(spec_coords_1) <- c("name", "Longitude_1", "Latitude_1")
+colnames(spec_coords_2) <- c("name", "Longitude_2", "Latitude_2")
 
-spec_coords_1$Latitude <- as.numeric(spec_coords_1$Latitude)
-spec_coords_1$Longitude <- as.numeric(spec_coords_1$Longitude)
+spec_coords_1$Latitude_1 <- as.numeric(spec_coords_1$Latitude_1)
+spec_coords_1$Longitude_1 <- as.numeric(spec_coords_1$Longitude_1)
 
-spec_coords_2$Latitude <- as.numeric(spec_coords_2$Latitude)
-spec_coords_2$Longitude <- as.numeric(spec_coords_2$Longitude)
+spec_coords_2$Latitude_2 <- as.numeric(spec_coords_2$Latitude_2)
+spec_coords_2$Longitude_2 <- as.numeric(spec_coords_2$Longitude_2)
+
+#5 year periods 
+all_specs_2 <- cbind(spec_coords_85_90,spec_coords_12_17)
+
+colnames(spec_coords_85_90) <- c("name", "Longitude_1", "Latitude_1")
+colnames(spec_coords_12_17) <- c("name", "Longitude_2", "Latitude_2")
+
+spec_coords_85_90$Latitude_1 <- as.numeric(spec_coords_85_90$Latitude_1)
+spec_coords_85_90$Longitude_1 <- as.numeric(spec_coords_85_90$Longitude_1)
+
+spec_coords_12_17$Latitude_2 <- as.numeric(spec_coords_12_17$Latitude_2)
+spec_coords_12_17$Longitude_2 <- as.numeric(spec_coords_12_17$Longitude_2)
 
 ```
 
@@ -562,7 +948,607 @@ write.csv(dist_total, "dist_total.csv")
 #lets save all of the mean centroid coordinates to map later
 write.csv(spec_coords_1, "spec_coords_1.csv")
 write.csv(spec_coords_2, "spec_coords_2.csv")
+
+#for 5 year chunks
+dist_total_5yr <- as.data.frame(distGeo(spec_coords_85_90[2:3], spec_coords_12_17[2:3]))
+dist_total_5yr <- cbind(specnames, dist_total_5yr)
+dist_total_5yr <- cbind(dist_total_5yr, spec_coords_85_90)
+dist_total_5yr <- cbind(dist_total_5yr, spec_coords_12_17)
+
+write.csv(dist_total_5yr, "dist_total_5yr.csv")
+
+#lets save all of the mean centroid coordinates to map later
+write.csv(spec_coords_85_90, "spec_coords_85_90.csv")
+write.csv(spec_coords_12_17, "spec_coords_12_17.csv")
+
 ```
+
+```{r distance IQR and box plot}
+boxplot(dist_total$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`)
+dist <- dist_total$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`
+Q3 <- quantile(dist, 0.75)
+Q1 <- quantile(dist, 0.25)
+
+lat <- dist_total$Latitude_1
+Q3_lat <- quantile(lat, 0.75)
+Q1_lat <- quantile(lat, 0.25)
+
+```
+
+#minimum convex hull 
+```{r}
+#note these use 95% but could also do 100 
+
+#need to have the original data to do this one
+fall_catch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22560_FSCSTables_Fall/22560_UNION_FSCS_SVCAT.csv")
+fall_x <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22560_FSCSTables_Fall/22560_UNION_FSCS_SVSTA.csv")
+
+#manipulated the catch data to be in tidy format 
+fall_catch$id <- as.numeric(as.character(fall_catch$id))
+
+#joining the tables 
+fall_x$id <- as.numeric(as.character(fall_x$id))
+fall <- left_join(fall_catch, fall_x, by="id")
+fall$season <- "fall"
+
+spring_catch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22561_FSCSTables_spring/22561_UNION_FSCS_SVCAT.csv")
+spring_x <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22561_FSCSTables_spring/22561_UNION_FSCS_SVSTA.csv")
+
+#manipulated the catch data to be in tidy format 
+spring_catch$id <- as.numeric(as.character(spring_catch$id))
+
+#joining the tables 
+spring_x$id <- as.numeric(as.character(spring_x$id))
+spring <- left_join(spring_catch, spring_x, by="id")
+spring$season <- "spring"
+
+total_big <- rbind(fall, spring)
+total_big_1 <- as.data.frame(total_big)
+
+total_big_1 <- total_big_1 %>% 
+  dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
+  rename(ID=scientific_name)
+
+
+#check if any specs have less than 5 relocations using dplyr
+total_big_1 <- subset(total_big_1, ID %in% names(which(table(ID) >= 5))) 
+total_big_1$ID <- factor(total_big_1$ID)
+
+#make a spatial object
+total_big_sp <- total_big_1 %>% drop_na()
+coordinates(total_big_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+library(adehabitatHR)
+
+
+spec_hull_tot <- mcp(total_big_sp[,1], percent=95)
+spec_hull_tot_area <- as.data.frame(spec_hull_tot[])
+
+
+#now for two time chunks
+total_big <- rbind(fall, spring)
+total_big_1 <- as.data.frame(total_big)
+
+total_big_first <- subset(total_big_1, est_year < 2000)
+total_big_second <- subset(total_big_1, est_year > 1999)
+
+#first
+total_big_first <- total_big_first %>% 
+  dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
+  rename(ID=scientific_name)
+
+
+#check if any specs have less than 5 relocations using dplyr
+total_big_first <- subset(total_big_first, ID %in% names(which(table(ID) >= 5)))
+total_big_first$ID <- factor(total_big_first$ID)
+
+#make a spatial object
+total_big_first_sp <- total_big_first %>% drop_na()
+coordinates(total_big_first_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+library(adehabitatHR)
+
+
+spec_hull_first <- mcp(total_big_first_sp[,1], percent=95)
+spec_hull_first_area <- as.data.frame(spec_hull_first[])
+
+#second
+total_big_second <- total_big_second %>% 
+  dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
+  rename(ID=scientific_name)
+
+
+#check if any specs have less than 5 relocations using dplyr
+total_big_second <- subset(total_big_second, ID %in% names(which(table(ID) >= 5)))
+total_big_second$ID <- factor(total_big_second$ID)
+
+#make a spatial object
+total_big_second_sp <- total_big_second %>% drop_na()
+coordinates(total_big_second_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+library(adehabitatHR)
+
+
+spec_hull_second <- mcp(total_big_second_sp[,1], percent=95)
+spec_hull_second_area <- as.data.frame(spec_hull_second[])
+
+write.csv(spec_hull_tot_area, file="spec_hull_tot_area.csv")
+write.csv(spec_hull_first_area, file="spec_hull_first_area.csv")
+write.csv(spec_hull_second_area, file="spec_hull_second_area.csv")
+```
+
+#abundance 
+Lets try and get out abunance for each species in the two time periods, that way we can compare those to things like BT and salinity importance vs substrate importance. Might get at who is more vulnerable to climate change 
+
+```{r}
+#first
+total <- read.csv("total.csv")
+xdata <- read.csv("xdata.csv")
+ydata <- total[,8:513]
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+total_data <- cbind(ycommon,xdata)
+
+first <- subset(total_data, est_year<2000)
+ydata <- first[,1:193]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 10, OTHER=F)$y
+
+newdat <- as.data.frame(colSums(ycommon))
+newdat$total <- colSums(newdat)
+newdat$relAb <- (newdat$'colSums(ycommon)')/newdat$total
+newdat$names <- colnames(ycommon)
+newdat_first <- newdat
+
+#second
+second <- subset(total_data, est_year>1999)
+ydata <- second[,1:193]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 10, OTHER=F)$y
+
+newdat <- as.data.frame(colSums(ycommon))
+newdat$total <- colSums(newdat)
+newdat$relAb <- (newdat$'colSums(ycommon)')/newdat$total
+newdat$names <- colnames(ycommon)
+newdat_second <- newdat
+
+#total
+ydata <- total[,8:513]
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+total_data <- cbind(ycommon,xdata)
+newdat <- as.data.frame(colSums(ycommon))
+newdat$total <- colSums(newdat)
+newdat$relAb <- (newdat$'colSums(ycommon)')/newdat$total
+newdat$names <- colnames(ycommon)
+newdat_total <- newdat
+
+
+write.csv(newdat_first, file= "abd_1.csv")
+write.csv(newdat_second, file= "abd_2.csv")
+write.csv(newdat_total, file= "abd_total.csv")
+
+
+```
+
+
+
+#variable importance (beta strength) vs shifting mean centroids
+I want to compare the strength of the betas to how far the species shifted to get at if sticky fish shift less 
+
+```{r sig substrate}
+sig_1_substrate <- cred_1_sig %>% 
+  filter(!is.na(siltmud)| !is.na(sand)) 
+
+sig_2_substrate <- cred_2_sig %>% 
+  filter(!is.na(siltmud)| !is.na(sand)) 
+
+#now go and manipulate in excel 
+write.csv(sig_1_substrate, file = "sig_1_substrate.csv")
+write.csv(sig_2_substrate, file = "sig_2_substrate.csv")
+
+sig_tot_substrate <- cred_tot_sig %>% 
+  filter(!is.na(siltmud)| !is.na(sand)) 
+
+
+#now go and manipulate in excel to add the geo distance column in (add column of just names (copy paste text to columns text to columns separate at _, then find replace ._ with ) and . with (  Then vlookup all of the names and add the distance column))
+write.csv(sig_tot_substrate, file = "sig_tot_substrate.csv")
+```
+
+
+```{r sig bt salinity}
+sig_1_env <- cred_1_sig %>% 
+  filter(!is.na(temp)| !is.na(sal)) 
+
+sig_2_env <- cred_2_sig %>% 
+  filter.!is.na(temp)| !is.na(sal)) 
+
+#now go and manipulate in excel 
+write.csv(sig_1_env, file = "sig_1_env.csv")
+write.csv(sig_2_env, file = "sig_2_env.csv")
+
+sig_tot_env <- cred_tot_sig %>% 
+  filter(!is.na(temp)| !is.na(sal)) 
+
+
+#now go and manipulate in excel to add the geo distance column in (add column of just names (copy paste text to columns text to columns separate at _, then find replace ._ with ) and . with (  Then vlookup all of the names and add the distance column))
+write.csv(sig_tot_env, file = "sig_tot_env.csv")
+```
+
+
+```{r glms}
+##substrate
+sig_1_sub_geo <- read.csv("sig_1_substrate_geo.csv")
+sig_2_sub_geo <- read.csv("sig_2_substrate_geo.csv")
+
+#first
+plot((sig_1_sub_geo$dist_geo.1), log(sig_1_sub_geo$Estimate.1))
+abline(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$dist_geo.1)))
+summary(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$dist_geo.1)))
+
+plot((sig_1_sub_geo$convex_hull), log(sig_1_sub_geo$Estimate.1))
+abline(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$convex_hull)))
+summary(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$convex_hull)))
+
+plot((sig_1_sub_geo$convex_hull_subtraction), log(sig_1_sub_geo$Estimate.1))
+abline(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$convex_hull_subtraction)))
+summary(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$convex_hull_subtraction)))
+
+
+plot((sig_1_sub_geo$abd), log(sig_1_sub_geo$Estimate.1))
+abline(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$abd)))
+summary(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$abd)))
+
+plot((sig_1_sub_geo$rel_ab), log(sig_1_sub_geo$Estimate.1))
+abline(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$rel_ab)))
+summary(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$rel_ab)))
+
+plot((sig_1_sub_geo$abd_subtract), log(sig_1_sub_geo$Estimate.1))
+abline(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$abd_subtract)))
+summary(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$abd_subtract)))
+
+plot((sig_1_sub_geo$rel_ab_subtract), log(sig_1_sub_geo$Estimate.1))
+abline(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$rel_ab_subtract)))
+summary(glm(log(sig_1_sub_geo$Estimate.1) ~ (sig_1_sub_geo$rel_ab_subtract)))
+
+
+#second
+plot((sig_2_sub_geo$dist_geo.1), log(sig_2_sub_geo$Estimate))
+abline(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$dist_geo.1)))
+summary(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$dist_geo.1)))
+
+plot((sig_2_sub_geo$convex_hull), log(sig_2_sub_geo$Estimate))
+abline(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$convex_hull)))
+summary(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$convex_hull)))
+
+plot((sig_2_sub_geo$convex_hull_subtraction), log(sig_2_sub_geo$Estimate))
+abline(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$convex_hull_subtraction)))
+summary(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$convex_hull_subtraction)))
+
+plot((sig_2_sub_geo$abd), log(sig_2_sub_geo$Estimate))
+abline(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$abd)))
+summary(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$abd)))
+
+plot((sig_2_sub_geo$rel_ab), log(sig_2_sub_geo$Estimate))
+abline(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$rel_ab)))
+summary(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$rel_ab)))
+
+plot((sig_2_sub_geo$abd_subtract), log(sig_2_sub_geo$Estimate))
+abline(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$abd_subtract)))
+summary(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$abd_subtract)))
+
+plot((sig_2_sub_geo$rel_ab_subtract), log(sig_2_sub_geo$Estimate))
+abline(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$rel_ab_subtract)))
+summary(glm(log(sig_2_sub_geo$Estimate) ~ (sig_2_sub_geo$rel_ab_subtract)))
+
+
+
+
+
+#total data
+sig_tot_sub_geo <- read.csv("sig_tot_substrate_geo.csv")
+
+
+plot((sig_tot_sub_geo$dist_geo_1), log(sig_tot_sub_geo$Estimate))
+abline(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$dist_geo_1)))
+summary(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$dist_geo_1)))
+
+plot((sig_tot_sub_geo$convex_hull), log(sig_tot_sub_geo$Estimate))
+abline(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$convex_hull)))
+summary(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$convex_hull)))
+
+plot((sig_tot_sub_geo$convex_hull_subtraction), log(sig_tot_sub_geo$Estimate))
+abline(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$convex_hull_subtraction)))
+summary(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$convex_hull_subtraction)))
+
+plot((sig_tot_sub_geo$abd), log(sig_tot_sub_geo$Estimate))
+abline(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$abd)))
+summary(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$abd)))
+
+plot((sig_tot_sub_geo$rel_ab), log(sig_tot_sub_geo$Estimate))
+abline(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$rel_ab)))
+summary(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$rel_ab)))
+
+plot((sig_tot_sub_geo$abd_subtract), log(sig_tot_sub_geo$Estimate))
+abline(lm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$abd_subtract)))
+summary(lm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$abd_subtract)))
+
+plot((sig_tot_sub_geo$rel_ab_subtract), log(sig_tot_sub_geo$Estimate))
+abline(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$rel_ab_subtract)))
+summary(glm(log(sig_tot_sub_geo$Estimate) ~ (sig_tot_sub_geo$rel_ab_subtract)))
+
+
+
+
+
+#salinity and bt 
+sig_tot_env_geo <- read.csv("sig_tot_env_geo.csv")
+sig_1_env_geo <- read.csv("sig_1_env_geo.csv")
+sig_2_env_geo <- read.csv("sig_2_env_geo.csv")
+
+#first
+plot((sig_1_env_geo$dist_geo), log(sig_1_env_geo$Estimate))
+abline(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$dist_geo)))
+summary(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$dist_geo)))
+
+plot((sig_1_env_geo$convex_hull), log(sig_1_env_geo$Estimate))
+abline(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$convex_hull)))
+summary(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$convex_hull)))
+
+plot((sig_1_env_geo$convex_hull_subtraction), log(sig_1_env_geo$Estimate))
+abline(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$convex_hull_subtraction)))
+summary(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$convex_hull_subtraction)))
+
+plot((sig_1_env_geo$abd), log(sig_1_env_geo$Estimate))
+abline(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$abd)))
+summary(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$abd)))
+
+plot((sig_1_env_geo$rel_ab), log(sig_1_env_geo$Estimate))
+abline(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$rel_ab)))
+summary(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$rel_ab)))
+
+plot((sig_1_env_geo$abd_subtract), log(sig_1_env_geo$Estimate))
+abline(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$abd_subtract)))
+summary(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$abd_subtract)))
+
+plot((sig_1_env_geo$rel_ab_subtract), log(sig_1_env_geo$Estimate))
+abline(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$rel_ab_subtract)))
+summary(glm(log(sig_1_env_geo$Estimate) ~ (sig_1_env_geo$rel_ab_subtract)))
+
+
+
+#second
+plot((sig_2_env_geo$dist_geo), log(sig_2_env_geo$Estimate))
+abline(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$dist_geo)))
+summary(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$dist_geo)))
+
+plot((sig_2_env_geo$convex_hull), log(sig_2_env_geo$Estimate))
+abline(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$convex_hull)))
+summary(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$convex_hull)))
+
+plot((sig_2_env_geo$convex_hull_subtraction), log(sig_2_env_geo$Estimate))
+abline(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$convex_hull_subtraction)))
+summary(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$convex_hull_subtraction)))
+
+plot((sig_2_env_geo$abd), log(sig_2_env_geo$Estimate))
+abline(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$abd)))
+summary(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$abd)))
+
+plot((sig_2_env_geo$rel_ab), log(sig_2_env_geo$Estimate))
+abline(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$rel_ab)))
+summary(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$rel_ab)))
+
+plot((sig_2_env_geo$abd_subtract), log(sig_2_env_geo$Estimate))
+abline(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$abd_subtract)))
+summary(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$abd_subtract)))
+
+plot((sig_2_env_geo$rel_ab_subtract), log(sig_2_env_geo$Estimate))
+abline(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$rel_ab_subtract)))
+summary(glm(log(sig_2_env_geo$Estimate) ~ (sig_2_env_geo$rel_ab_subtract)))
+
+
+
+#total
+plot((sig_tot_env_geo$dist_geo), log(sig_tot_env_geo$Estimate))
+abline(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$dist_geo)))
+summary(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$dist_geo)))
+
+plot((sig_tot_env_geo$convex_hull_subtraction), log(sig_tot_env_geo$Estimate))
+abline(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$convex_hull_subtraction)))
+summary(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$convex_hull_subtraction)))
+
+plot((sig_tot_env_geo$convex_hull), log(sig_tot_env_geo$Estimate))
+abline(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$convex_hull)))
+summary(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$convex_hull)))
+
+
+plot(log(sig_tot_env_geo$abd), log(sig_tot_env_geo$Estimate))
+abline(glm(log(sig_tot_env_geo$Estimate) ~ log(sig_tot_env_geo$abd)))
+summary(glm(log(sig_tot_env_geo$Estimate) ~ log(sig_tot_env_geo$abd)))
+
+plot((sig_tot_env_geo$rel_ab), log(sig_tot_env_geo$Estimate))
+abline(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$rel_ab)))
+summary(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$rel_ab)))
+
+plot((sig_tot_env_geo$abd_subtract), log(sig_tot_env_geo$Estimate))
+abline(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$abd_subtract)))
+summary(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$abd_subtract)))
+
+plot((sig_tot_env_geo$rel_ab_subtract), log(sig_tot_env_geo$Estimate))
+abline(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$rel_ab_subtract)))
+summary(glm(log(sig_tot_env_geo$Estimate) ~ (sig_tot_env_geo$rel_ab_subtract)))
+
+
+
+```
+
+
+```{r second time chunk}
+
+```
+
+#sankey 
+Okay so I have messed with the excel file change_total a bit to pull out the significant variables and group the species based on their sig relationship with the env. that is all in the change_total csv and tab in the bigger excel document 
+
+```{r}
+Change_total <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/Change_total.csv")
+library(googleVis)
+```
+
+```{r sankey all}
+dataSk <- data.frame( from = Change_total$Group_1, to= Change_total$Group_2 , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "3000",
+                                 height = "2000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+sankeyplot <- plot(sankey) 
+
+plot(sankey)
+```
+
+now lets just look at specific variables that change 
+
+```{r sankey salinity}
+dataSk <- data.frame( from = Change_total$sal.x, to= Change_total$sal_y , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+sankeyplot <- plot(sankey) 
+
+#plot(sankey)
+```
+
+```{r sankey depth}
+dataSk <- data.frame( from = Change_total$depth.x, to= Change_total$depth_y , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+sankeyplot <- plot(sankey) 
+
+#plot(sankey)
+```
+
+```{r sankey substrate}
+dataSk <- data.frame( from = Change_total$substrate, to= Change_total$substrate_y , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+sankeyplot <- plot(sankey) 
+
+#plot(sankey)
+```
+
+```{r sankey AMO}
+dataSk <- data.frame( from = Change_total$AMO.x, to= Change_total$AMO_y , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+sankeyplot <- plot(sankey) 
+
+#plot(sankey)
+```
+
+```{r sankey NAO}
+dataSk <- data.frame( from = Change_total$O.x, to= Change_total$NAO_y , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+sankeyplot <- plot(sankey) 
+
+#plot(sankey)
+```
+
+```{r sankey bt}
+dataSk <- data.frame( from = Change_total$temp.x, to= Change_total$temp_y , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+sankeyplot <- plot(sankey) 
+
+#plot(sankey)
+```
+
+
+```{r sankey all simplified}
+Change_total <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/simp_groups.csv")
+dataSk <- data.frame( from = Change_total$simp_group, to= Change_total$simp_group2 , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "2000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+sankeyplot <- plot(sankey) 
+
+plot(sankey)
+```
+
+```{r sankey egroups}
+Change_total <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/egroups.csv", stringsAsFactors = FALSE)
+
+Change_total[Change_total=="one"] <- "cool, nonsaline"
+Change_total[Change_total=="two"] <- "deep, cool and warm"
+Change_total[Change_total=="three"] <- "warm and cool, shallow, nonsaline"
+Change_total[Change_total=="four"] <- "warm, shallow"
+
+
+Change_total[Change_total=="first"] <- "warm, shallow."
+Change_total[Change_total=="second"] <- "cool, deep, nonsaline, mud"
+Change_total[Change_total=="third"] <- "cool, shallow, nonsaline"
+Change_total[Change_total=="fourth"] <- "warm, deep saline"
+
+
+dataSk <- data.frame( from = Change_total$E_a, to= Change_total$E_b , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "2000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+
+
+
+sankeyplot <- plot(sankey) 
+
+plot(sankey)
+```
+
+
+even though nobody changes BT preferences, there are some species where BT wasn't importnat and then it was. In fact, in the future, bottom temperature becomes more improtant, which could be a cool ecological question (the same thing happens with salinity and depth, but we don't see this finding with substrate)
+
+
+#Things to look at
+1) species that went from non sig to having sig temperature relationship, was their non sig temperature preference the same or opposite from the other one 
+
+2)I have to figure out a way to combine the geographic (shifting mean centroids) with the shifting environmental preferences data. Interesting questions could be are the species that are shifting geographically trying to stay within their preferred salinity range and don't care as much about substrate? What types of species are they? Are some that are not switching substrate switching salinity or temperature or depth? 
+
+3) Also I should look at fishing pressure and see who is more influenced by fishing pressure and if those have shifted geographically or in environmental space. 
 
 
 
@@ -588,5 +1574,18 @@ xnames <- c("year", "depth", "btemp", "ssalin", "AMO_unsm_month", "NAO_month", "
 ydata <- bioandcatch[,specNames]
 xdata <- bioandcatch[,xnames]
 
+
+```{r species diversity}
+#how is species diversity related to environmental similarity? 
+library(vegan)
+library(Hotelling)
+ydata <- read.csv("ydata.csv")
+ydata <- ydata[2:508]
+
+shann <- diversity(ydata)
+simp <- (diversity(ydata,"simpson"))
+total <- cbind(total, shann)
+
+div <- glm(simp ~ surftemp + bottemp + botsalin + avgdepth + NAO_JFM + SD3x3shortsal + SD3x3shortsst + SD3x3shortbt, data = total)
 ```
 
