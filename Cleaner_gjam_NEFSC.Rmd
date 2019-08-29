@@ -231,7 +231,7 @@ So I could go a couple of ways here. I could follow Batt 2017 which selected a n
 
 ```{r selecting species, include=FALSE}
 #splitting into x and ydata 
-ydata <- total[,7:513]
+ydata <- total[,7:508]
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 total_data <- cbind(ycommon,xdata)
 
@@ -518,14 +518,21 @@ cred_tot_sig <- cred_tot %>%
 ```
 
 ```{r first chunk with SD}
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+#so I ran this with all of the SD types and the one that came out as much more important in the frist was the 3x3 short ones so I am going to rerun with just those for both time periods. 
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+total_data <- cbind(ycommon,xdata)
+
 #first time chunk 
 total <- subset(total_data, est_year < 2000)
-ydata <- total[,1:193]
+ydata <- total[,2:194]
 ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 #need to do this here to see ones that werent caught early and are caught later 
 
-xdata <- total %>% dplyr::select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp, botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth, LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon, SED_TYPE, SD3x3longsal, SD3x3longbt, SD3x3longsst, SD10x10longsal, SD10x10longbt, SD10x10longsst, SD3x3shortsal, SD3x3shortbt, SD3x3shortsst, SD10x10shortsal, SD10x10shortbt, SD10x10shortsst)
+xdata <- total %>% dplyr::select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp, botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth, LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon, SED_TYPE, SD3x3shortsal, SD3x3shortbt, SD3x3shortsst)
 
 S <- ncol(ycommon)
 ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
@@ -543,11 +550,11 @@ xdata$bottemp <- as.numeric(xdata$bottemp)
 xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
 
 
-out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3longsal+ SD3x3longbt + SD3x3longsst+ SD10x10longsal + SD10x10longbt + SD10x10longsst + SD3x3shortsal+ SD3x3shortbt + SD3x3shortsst + SD10x10shortsal + SD10x10shortbt + SD10x10shortsst, xdata, ycommon, modelList = ml)
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal+ SD3x3shortbt + SD3x3shortsst, xdata, ycommon, modelList = ml)
 
 save(out, file='out_85_99_SD.Rdata')
 load('out_85_99_SD.Rdata')
-plotPars <- list(SMALLPLOTS = TRUE, GRIDPLOTS=T, PLOTALLY=TRUE, SAVEPLOTS=TRUE)
+plotPars <- list(GRIDPLOTS=T, PLOTALLY=TRUE)
 gjamPlot(out, plotPars=plotPars)
 
 #get informative stuff and save 
@@ -578,28 +585,27 @@ cluster1_order <- gp$clusterOrder
 #The order of species and the cluster groups to which they belong are returned in fit$clusterOrder and fit$clusterIndex.
 
 
-#trying with more clusters doesn't really work 
-load('out_82_99.Rdata')
-plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
-gp <- gjamPlot(output = out, plotPars = plotPars)
-gp$clusterIndex
-gp$clusterOrder
-#The order of species and the cluster groups to which they belong are returned in fit$clusterOrder and fit$clusterIndex.
-
 ```
 
 
 
 
 ```{r second time chunk with SD }
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
 #second time chunk 
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+total_data <- cbind(ycommon,xdata)
+
+#first time chunk 
 total <- subset(total_data, est_year > 1999)
-ydata <- total[,1:193]
+ydata <- total[,2:194]
 ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 #need to do this here to see ones that werent caught early and are caught later 
 
-xdata <- total %>% dplyr::select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp, botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth, LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon, SED_TYPE, SD3x3longsal, SD3x3longbt, SD3x3longsst, SD10x10longsal, SD10x10longbt, SD10x10longsst, SD3x3shortsal, SD3x3shortbt, SD3x3shortsst, SD10x10shortsal, SD10x10shortbt, SD10x10shortsst)
+xdata <- total %>% dplyr::select(id, est_month, est_day, est_year,surftemp, surfsalin, bottemp, botsalin, AMO_unsm_month, AMO_unsm_year, NAO_month, NAO_year, NAO_JFM, avgdepth, LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon, SED_TYPE, SD3x3shortsal, SD3x3shortbt, SD3x3shortsst)
 
 S <- ncol(ycommon)
 ml <- list(ng = 10000, burnin = 2000, typeNames = 'DA')
@@ -617,12 +623,12 @@ xdata$bottemp <- as.numeric(xdata$bottemp)
 xdata$NAO <- as.numeric(as.character((xdata$NAO_year)))
 
 
-out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3longsal+ SD3x3longbt + SD3x3longsst+ SD10x10longsal + SD10x10longbt + SD10x10longsst + SD3x3shortsal+ SD3x3shortbt + SD3x3shortsst + SD10x10shortsal + SD10x10shortbt + SD10x10shortsst, xdata, ycommon, modelList = ml)
+out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal+ SD3x3shortbt + SD3x3shortsst, xdata, ycommon, modelList = ml)
 
 
 save(out, file='out_99_15_SD.Rdata')
 load('out_99_15_SD.Rdata')
-plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+plotPars <- list(GRIDPLOTS=T, SMALLPLOTS=T)
 gjamPlot(out, plotPars=plotPars)
 
 #getting informative stuff 
@@ -652,8 +658,9 @@ cred_2_sig <- cred_2 %>%
   filter(sig95 == "*") %>% 
   filter(!grepl('intercept', names))  #remove anything that says intercept in there 
 
-gp <- gjamPlot(output = out, plotPars = plotPars)
+#gp <- gjamPlot(output = out, plotPars = plotPars)
 cluster2 <- gp$clusterIndex
+cluster2_order <- gp$clusterOrder
 #There are three versions, data, E, and R that correspond to plots that come out. E = environmental response, R = residual covariance
 
 
@@ -793,6 +800,181 @@ cred_tot_sig$NAO <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "NAO"
                            ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "NAO", "NAO-", NA)) 
 
 ```
+```{r matching and shifts for SD included}
+#find matching cases 
+match <- charmatch(cred_1_sig$names, cred_2_sig$names)
+cred_1_sig <- cbind(cred_1_sig, match)
+
+#adding columns for descriptions 
+cred_1_sig$var <- ifelse(grepl("bottemp", cred_1_sig$names), "temp",
+                         ifelse(grepl("botsalin", cred_1_sig$names), "sal", 
+                                ifelse(grepl("avgdepth", cred_1_sig$names), "depth",
+                                       ifelse(grepl("SEDTYPESilt/Mud", cred_1_sig$names), "silt/mud",
+                                               ifelse(grepl("SEDTYPESand", cred_1_sig$names), "sand",
+                                                      ifelse(grepl("AMOunsmyear", cred_1_sig$names), "AMO",
+                                                             ifelse(grepl("NAOyear", cred_1_sig$names),
+                                                                    "NAO", 
+                                                                    ifelse(grepl("SD3x3shortsal", cred_1_sig$names), "SD_sal", 
+                                                                        ifelse(grepl("SD3x3shortbt", cred_1_sig$names), "SD_bt", 
+                                                                         ifelse(grepl("SD3x3shortsst", cred_1_sig$names), "SD_sst", NA))))))))))
+
+
+cred_1_sig$temp <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "temp", "warm", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "temp", "cool", NA))  
+
+cred_1_sig$sal <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "sal", "saline", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "sal", "nonsaline", NA)) 
+
+cred_1_sig$depth <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "depth", "deep", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "depth", "shallow", NA)) 
+
+cred_1_sig$siltmud <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "silt/mud", "silt/mud", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "silt/mud", "nosilt/mud", NA)) 
+
+cred_1_sig$sand <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "sand", "sand", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "sand", "nosand", NA))
+
+cred_1_sig$AMO <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "AMO", "AMO+", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "AMO", "AMO-", NA)) 
+
+cred_1_sig$NAO <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "NAO", "NAO+", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "NAO", "NAO-", NA)) 
+cred_1_sig$SD_sal <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "SD_sal", "variable_sal", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "SD_sal", "notvariable_sal", NA)) 
+
+cred_1_sig$SD_bt <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "SD_bt", "variable_bt", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "SD_bt", "notvariable_bt", NA)) 
+
+cred_1_sig$SD_sst <- ifelse(cred_1_sig$Estimate > 1 & cred_1_sig$var == "SD_sst", "variable_sst", 
+                           ifelse(cred_1_sig$Estimate < 1 & cred_1_sig$var == "SD_sst", "notvariable_sst", NA)) 
+
+
+#adding columns for descriptions for the second time period
+cred_2_sig$var <- ifelse(grepl("bottemp", cred_2_sig$names), "temp",
+                         ifelse(grepl("botsalin", cred_2_sig$names), "sal", 
+                                ifelse(grepl("avgdepth", cred_2_sig$names), "depth",
+                                       ifelse(grepl("SEDTYPESilt/Mud", cred_2_sig$names), "silt/mud",
+                                               ifelse(grepl("SEDTYPESand", cred_2_sig$names), "sand",
+                                                      ifelse(grepl("AMOunsmyear", cred_2_sig$names), "AMO",
+                                                             ifelse(grepl("NAOyear", cred_2_sig$names), "NAO", 
+                                                                    ifelse(grepl("SD3x3shortsal", cred_2_sig$names), "SD_sal", 
+                                                                        ifelse(grepl("SD3x3shortbt", cred_2_sig$names), "SD_bt", 
+                                                                         ifelse(grepl("SD3x3shortsst", cred_2_sig$names), "SD_sst", NA))))))))))
+
+
+
+cred_2_sig$temp <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "temp", "warm", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "temp", "cool", NA))  
+
+cred_2_sig$sal <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "sal", "saline", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "sal", "nonsaline", NA)) 
+
+cred_2_sig$depth <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "depth", "deep", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "depth", "shallow", NA)) 
+
+cred_2_sig$siltmud <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "silt/mud", "silt/mud", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "silt/mud", "nosilt/mud", NA)) 
+
+cred_2_sig$sand <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "sand", "sand", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "sand", "nosand", NA))
+
+cred_2_sig$AMO <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "AMO", "AMO+", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "AMO", "AMO-", NA)) 
+
+cred_2_sig$NAO <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "NAO", "NAO+", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "NAO", "NAO-", NA)) 
+
+cred_2_sig$SD_sal <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "SD_sal", "variable_sal", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "SD_sal", "notvariable_sal", NA)) 
+
+cred_2_sig$SD_bt <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "SD_bt", "variable_bt", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "SD_bt", "notvariable_bt", NA)) 
+
+cred_2_sig$SD_sst <- ifelse(cred_2_sig$Estimate > 1 & cred_2_sig$var == "SD_sst", "variable_sst", 
+                           ifelse(cred_2_sig$Estimate < 1 & cred_2_sig$var == "SD_sst", "notvariable_sst", NA)) 
+
+
+
+
+
+#lets just compare the matching ones 
+cred_1_sig_match <- cred_1_sig %>% 
+   filter(!is.na(match)) 
+
+cred_2_sig$match <- rownames(cred_2_sig)
+
+new <- merge(cred_1_sig_match, cred_2_sig, by = "match")
+write.csv(new, file="only_matching_sig_betas_SD.csv")
+#went into excel and highlighted the changed ones but also made column called change here is that file 
+#change <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/only_matching_sig_betas_changeshown_SD.csv")
+
+#lets get the non matching ones to help us get at question 2 below 
+cred_1_sig_nomatch <- cred_1_sig %>% 
+   filter(is.na(match)) 
+write.csv(cred_1_sig_nomatch, file="cred_1_sig_nomatch_SD.csv")
+
+#other way around also  
+match2 <- charmatch(cred_2_sig$names, cred_1_sig$names)
+cred_2_sig <- cred_2_sig %>% 
+    select(-match) 
+cred_2_sig <- cbind(cred_2_sig, match2)
+
+cred_2_sig_nomatch <- cred_2_sig %>% 
+   filter(is.na(match2)) 
+write.csv(cred_2_sig_nomatch, file="cred_2_sig_nomatch_SD.csv")
+
+write.csv(cred_2_sig, file = "cred_2_sig_all_SD.csv")
+write.csv(cred_1_sig, file = "cred_1_sig_all_SD.csv")
+
+#total data adding columns 
+cred_tot_sig$var <- ifelse(grepl("bottemp", cred_tot_sig$names), "temp",
+                         ifelse(grepl("botsalin", cred_tot_sig$names), "sal", 
+                                ifelse(grepl("avgdepth", cred_tot_sig$names), "depth",
+                                       ifelse(grepl("SEDTYPESilt/Mud", cred_tot_sig$names), "silt/mud",
+                                               ifelse(grepl("SEDTYPESand", cred_tot_sig$names), "sand",
+                                                      ifelse(grepl("AMOunsmyear", cred_tot_sig$names), "AMO",
+                                                             ifelse(grepl("NAOyear", cred_tot_sig$names),
+                                                                    "NAO", 
+                                                                    ifelse(grepl("SD3x3shortsal", cred_tot_sig_names), "SD_sal", 
+                                                                        ifelse(grepl("SD3x3shortbt", cred_tot_sig$names), "SD_bt", 
+                                                                         ifelse(grepl("SD3x3shortsst", cred_tot_sig_names), "SD_sst", NA))))))))))
+
+
+cred_tot_sig$temp <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "temp", "warm", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "temp", "cool", NA))  
+
+cred_tot_sig$sal <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "sal", "saline", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "sal", "nonsaline", NA)) 
+
+cred_tot_sig$depth <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "depth", "deep", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "depth", "shallow", NA)) 
+
+cred_tot_sig$siltmud <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "silt/mud", "silt/mud", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "silt/mud", "nosilt/mud", NA)) 
+
+cred_tot_sig$sand <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "sand", "sand", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "sand", "nosand", NA))
+
+cred_tot_sig$AMO <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "AMO", "AMO+", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "AMO", "AMO-", NA)) 
+
+cred_tot_sig$NAO <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "NAO", "NAO+", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "NAO", "NAO-", NA)) 
+
+cred_tot_sig$SD_sal <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "SD_sal", "variable_sal", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "SD_sal", "notvariable_sal", NA)) 
+
+cred_tot_sig$SD_bt <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "SD_bt", "variable_bt", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "SD_bt", "notvariable_bt", NA)) 
+
+cred_tot_sig$SD_sst <- ifelse(cred_tot_sig$Estimate > 1 & cred_tot_sig$var == "SD_sst", "variable_sst", 
+                           ifelse(cred_tot_sig$Estimate < 1 & cred_tot_sig$var == "SD_sst", "notvariable_sst", NA)) 
+
+write.csv(cred_tot_sig, file="cred_tot_sig_SD.csv")
+
+```
+
+
 Okay so we could have a few things happening. 
 1. species relationship with BT could be positive in the first time period and negative in second (both significant relationships)
   Highlighted yellow in csv file only_matching_sig_betas_changeshown.csv
@@ -1159,7 +1341,7 @@ sig_1_env <- cred_1_sig %>%
   filter(!is.na(temp)| !is.na(sal)) 
 
 sig_2_env <- cred_2_sig %>% 
-  filter.!is.na(temp)| !is.na(sal)) 
+  filter(!is.na(temp)| !is.na(sal)) 
 
 #now go and manipulate in excel 
 write.csv(sig_1_env, file = "sig_1_env.csv")
@@ -1551,8 +1733,22 @@ even though nobody changes BT preferences, there are some species where BT wasn'
 3) Also I should look at fishing pressure and see who is more influenced by fishing pressure and if those have shifted geographically or in environmental space. 
 
 
+#sankey with SD variables 
 
+```{r sankey SD}
+Change_total <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/Change_total_SD.csv")
+dataSk <- data.frame( from = Change_total$variable, to= Change_total$variable.1 , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "2000",
+                                 height = "1000",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
 
+sankeyplot <- plot(sankey) 
+
+plot(sankey)
+```
 
 
 #"ATLANTOPANDALUS.PROPINQVUS","CANCER.PLEBEJUS", "CHACEON.QUINQUEDENS",
