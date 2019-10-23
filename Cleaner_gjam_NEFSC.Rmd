@@ -331,7 +331,7 @@ out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYP
 save(out, file='out_full_85_99.Rdata')
 load('out_full_85_99.Rdata')
 plotPars <- list(SMALLPLOTS = TRUE, GRIDPLOTS=T, PLOTALLY=TRUE, SAVEPLOTS=FALSE)
-gjamPlot(out, plotPars=plotPars)
+#gjamPlot(out, plotPars=plotPars)
 
 #get informative stuff and save 
 DIC_1 <- out$fit$DIC         # DIC
@@ -1366,7 +1366,8 @@ I also have to go through and see if species were not caught (or not caught enou
 
 
 
-#shifting mean centroids? 
+#Shfiting ENV 
+##mean centroids
 This is to get at if the environment is changing or if species are changing with the environment. 
 ```{r load pacakges}
 install.packages("sp")
@@ -1570,7 +1571,7 @@ Q1_lat <- quantile(lat, 0.25)
 
 ```
 
-#minimum convex hull 
+##minimum convex hull 
 ```{r}
 #note these use 95% but could also do 100 
 
@@ -1671,8 +1672,16 @@ write.csv(spec_hull_tot_area, file="spec_hull_tot_area.csv")
 write.csv(spec_hull_first_area, file="spec_hull_first_area.csv")
 write.csv(spec_hull_second_area, file="spec_hull_second_area.csv")
 ```
+manipulating what I already did in excel to get the specnames into the format I want 
 
-#abundance 
+```{r}
+spec_hull_tot <- read.csv("spec_hull_tot_area_2.csv")
+spec_hull_first <- read.csv("spec_hull_first_area_2.csv")
+spec_hull_second <- read.csv("spec_hull_second_area_2.csv")
+```
+
+
+##abundance 
 Lets try and get out abunance for each species in the two time periods, that way we can compare those to things like BT and salinity importance vs substrate importance. Might get at who is more vulnerable to climate change 
 
 ```{r}
@@ -1683,10 +1692,11 @@ ydata <- read.csv("ydata.csv")
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 total_data <- cbind(ycommon,xdata)
 
-first <- subset(total_data, est_year<2000)
-ydata <- first[,2:191]
+total <- subset(total, est_year < 2000)
+ydata <- total[,2:508]
 ydata[is.na(ydata)] <- 0
-ycommon <- gjamTrimY(ydata, 10, OTHER=F)$y
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+
 
 newdat <- as.data.frame(colSums(ycommon))
 newdat$total <- colSums(newdat)
@@ -1695,10 +1705,13 @@ newdat$names <- colnames(ycommon)
 newdat_first <- newdat
 
 #second
-second <- subset(total_data, est_year>1999)
-ydata <- second[,2:191]
+total <- read.csv("total.csv")
+xdata <- read.csv("xdata.csv")
+ydata <- read.csv("ydata.csv")
+total <- subset(total, est_year > 1999)
+ydata <- total[,2:508]
 ydata[is.na(ydata)] <- 0
-ycommon <- gjamTrimY(ydata, 10, OTHER=F)$y
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 
 newdat <- as.data.frame(colSums(ycommon))
 newdat$total <- colSums(newdat)
@@ -1723,16 +1736,503 @@ write.csv(newdat_first, file= "abd_1_v2.csv")
 write.csv(newdat_second, file= "abd_2_v2.csv")
 write.csv(newdat_total, file= "abd_total_v2.csv")
 
-
+abd_first <- newdat_first
+colnames(abd_first) <- c("abd", "total_catch_abd", "relAb", "names")
+abd_second <- newdat_second
+colnames(abd_second) <- c("abd", "total_catch_abd", "relAb", "names")
+abd_total <- newdat_total
+colnames(abd_total) <- c("abd", "total_catch_abd", "relAb", "names")
 ```
 
+#Combining all the data
+Okay now lets combine all of the information together based on species names
+we have the betas for each species for each time period, distance measures for each time period lets add them all into one big dataset
+
+```{r}
+#cluster data 
+cluster1 <- as.data.frame(cluster1)
+cluster1$names <- rownames(cluster1)
+
+cluster2 <- as.data.frame(cluster2)
+cluster2$names <- rownames(cluster2)
+```
+
+```{r}
+#need to go in and get all of the data I want and rename columns so its easier
+colnames(spec_hull_first) <- c("X", "id", "convex_hull_first")
+colnames(spec_hull_second) <- c("X", "id", "convex_hull_second")
+colnames(spec_hull_tot) <- c("X", "id", "convex_hull_tot")
+colnames(dist_total) <- c("names", "dist_shifted", "names_2", "x", "y", "names_3", "x_1", "y_1")
+colnames(abd_first) <- c("abd_1", "total_catch_abd_1","relAb_1","names" )
+colnames(abd_second) <- c("abd_2", "total_catch_abd_2","relAb_2","names" )
+colnames(abd_total) <- c("abd_tot", "total_catch_abd_tot","relAb_tot","names" )
+
+
+cred_1_sig_comb <- left_join(cred_1_sig, spec_hull_first, by = c("names"="id"))
+cred_1_sig_comb <- left_join(cred_1_sig_comb, spec_hull_second, by = c("names"="id"))
+cred_1_sig_comb <- left_join(cred_1_sig_comb, spec_hull_tot, by = c("names"="id"))
+cred_1_sig_comb <- left_join(cred_1_sig_comb, dist_total, by = "names")
+cred_1_sig_comb <- left_join(cred_1_sig_comb, abd_first, by = "names")
+cred_1_sig_comb <- left_join(cred_1_sig_comb, abd_second, by = "names")
+cred_1_sig_comb <- left_join(cred_1_sig_comb, cluster1, by = "names")
+
+cred_2_sig_comb <- left_join(cred_2_sig, spec_hull_first, by = c("names"="id"))
+cred_2_sig_comb <- left_join(cred_2_sig_comb, spec_hull_second, by = c("names"="id"))
+cred_2_sig_comb <- left_join(cred_2_sig_comb, spec_hull_tot, by = c("names"="id"))
+cred_2_sig_comb <- left_join(cred_2_sig_comb, dist_total, by = "names")
+cred_2_sig_comb <- left_join(cred_2_sig_comb, abd_first, by = "names")
+cred_2_sig_comb <- left_join(cred_2_sig_comb, abd_second, by = "names")
+cred_2_sig_comb <- left_join(cred_2_sig_comb, cluster2, by = "names")
+
+
+cred_tot_sig_comb <- left_join(cred_tot_sig, spec_hull_first, by = c("names"="id"))
+cred_tot_sig_comb <- left_join(cred_tot_sig_comb, spec_hull_second, by = c("names"="id"))
+cred_tot_sig_comb <- left_join(cred_tot_sig_comb, spec_hull_tot, by = c("names"="id"))
+cred_tot_sig_comb <- left_join(cred_tot_sig_comb, dist_total, by = "names")
+cred_tot_sig_comb <- left_join(cred_tot_sig_comb, abd_first, by = "names")
+cred_tot_sig_comb <- left_join(cred_tot_sig_comb, abd_second, by = "names")
+
+#adding in some variables for changes between first and second time period 
+cred_tot_sig_comb <- cred_tot_sig_comb %>% 
+  dplyr:::select(-X.x, -X.y, -y_1, -x_1, -names_2, -names_3, -X)
+cred_1_sig_comb <- cred_1_sig_comb %>% 
+  dplyr:::select(-X.x, -X.y, -y_1, -x_1, -names_2, -names_3, -X)
+cred_2_sig_comb <- cred_2_sig_comb %>% 
+  dplyr:::select(-X.x, -X.y, -y_1, -x_1, -names_2, -names_3, -X)
+
+cred_tot_sig_comb$abd_diff <- cred_tot_sig_comb$abd_2 - cred_tot_sig_comb$abd_1
+cred_tot_sig_comb$rel_abd_diff <- cred_tot_sig_comb$relAb_2 - cred_tot_sig_comb$relAb_1
+cred_tot_sig_comb$convex_diff <- cred_tot_sig_comb$convex_hull_second - cred_tot_sig_comb$convex_hull_first
+
+cred_2_sig_comb$abd_diff <- cred_2_sig_comb$abd_2 - cred_2_sig_comb$abd_1
+cred_2_sig_comb$rel_abd_diff <- cred_2_sig_comb$relAb_2 - cred_2_sig_comb$relAb_1
+cred_2_sig_comb$convex_diff <- cred_2_sig_comb$convex_hull_second - cred_2_sig_comb$convex_hull_first
+
+cred_1_sig_comb$abd_diff <- cred_1_sig_comb$abd_2 - cred_1_sig_comb$abd_1
+cred_1_sig_comb$rel_abd_diff <- cred_1_sig_comb$relAb_2 - cred_1_sig_comb$relAb_1
+cred_1_sig_comb$convex_diff <- cred_1_sig_comb$convex_hull_second - cred_1_sig_comb$convex_hull_first
+
+
+#creating a big file for change 
+change_tot <- full_join(cred_1_sig_comb, cred_2_sig_comb, by="names")
+
+
+```
 
 
 #variable importance (beta strength) vs shifting mean centroids
 I want to compare the strength of the betas to how far the species shifted to get at if sticky fish shift less 
 
-The first thing I need to do is to take each of the cred_sig files and manipulate it in excel. I just need each file with the species name, cred
+This should be really easy to do now that I have manipulated the data above 
 
+```{r}  
+cred_tot_sig_comb <- cred_tot_sig_comb %>%  
+  filter(!names %in% c("Anchoa.mitchilli..bay.anchovy.", "Anchoa.hepsetus..striped.anchovy."))
+
+#this makes one data frame with just the substrate variables combined 
+cred_tot_sub1 <- cred_tot_sig_comb %>% 
+  dplyr:::select(names, `SEDTYPESilt/Mud`, dist_shifted, convex_diff, rel_abd_diff, abd_diff)
+cred_tot_sub1$sub <- cred_tot_sub1$`SEDTYPESilt/Mud`
+
+cred_tot_sub12 <- cred_tot_sig_comb %>% 
+  dplyr:::select(names, SEDTYPESand, dist_shifted, convex_diff, rel_abd_diff, abd_diff)
+cred_tot_sub12$sub <- cred_tot_sub12$SEDTYPESand
+cred_tot_sub12$names <- paste(cred_tot_sub12$names, "2", sep="")
+
+
+cred_sub <- smartbind(cred_tot_sub1, cred_tot_sub12)
+
+ggplot(cred_sub, aes(x=dist_shifted, y=abs(sub))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_sub, aes(x=convex_diff, y=abs(sub))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_sub, aes(x=rel_abd_diff, y=abs(sub))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+
+##distance shifted 
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(AMOunsmyear))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(avgdepth))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(botsalin))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(bottemp))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(gebcoSD2))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(NAOyear))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(SD3x3shortbt))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(SD3x3shortsal))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(SD3x3shortsst))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(SEDTYPESand))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=abs(`SEDTYPESilt/Mud`))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+##convex hull subtraction 
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(AMOunsmyear))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(avgdepth))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(botsalin))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(bottemp))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(gebcoSD2))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(NAOyear))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(SD3x3shortbt))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(SD3x3shortsal))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(SD3x3shortsst))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(SEDTYPESand))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=abs(`SEDTYPESilt/Mud`))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+
+
+##relative abundance diff 
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(AMOunsmyear))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(avgdepth))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(botsalin))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(bottemp))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(gebcoSD2))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(NAOyear))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(SD3x3shortbt))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(SD3x3shortsal))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(SD3x3shortsst))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(SEDTYPESand))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=abs(`SEDTYPESilt/Mud`))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+##abd diff
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(AMOunsmyear))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(avgdepth))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(botsalin))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(bottemp))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(gebcoSD2))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(NAOyear))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(SD3x3shortbt))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(SD3x3shortsal))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(SD3x3shortsst))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(SEDTYPESand))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=abs(`SEDTYPESilt/Mud`))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+
+```
+
+non absolute value 
+```{r}  
+cred_tot_sig_comb <- cred_tot_sig_comb %>%  
+  filter(!names %in% c("Anchoa.mitchilli..bay.anchovy.", "Anchoa.hepsetus..striped.anchovy."))
+
+
+##distance shifted 
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=AMOunsmyear)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=avgdepth)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=botsalin)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=bottemp)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=gebcoSD2)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=NAOyear)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=SD3x3shortbt)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=SD3x3shortsal)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=SD3x3shortsst)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=SEDTYPESand)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=dist_shifted, y=`SEDTYPESilt/Mud`)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+##convex hull subtraction 
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=AMOunsmyear)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=avgdepth)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=botsalin)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=bottemp)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=gebcoSD2)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=NAOyear)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=SD3x3shortbt)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=SD3x3shortsal)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=SD3x3shortsst)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=SEDTYPESand)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=convex_diff, y=`SEDTYPESilt/Mud`)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+
+
+##relative abundance diff 
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=AMOunsmyear)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=avgdepth)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=botsalin)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=bottemp)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=gebcoSD2)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=NAOyear)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=SD3x3shortbt)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=SD3x3shortsal)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=SD3x3shortsst)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=SEDTYPESand)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=rel_abd_diff, y=`SEDTYPESilt/Mud`)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+##abd diff
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=AMOunsmyear)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=avgdepth)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=botsalin)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=bottemp)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=gebcoSD2)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=NAOyear)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=SD3x3shortbt)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=SD3x3shortsal)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=SD3x3shortsst)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) #this is a good result!!
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=SEDTYPESand)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_tot_sig_comb, aes(x=abd_diff, y=`SEDTYPESilt/Mud`)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+
+```
+
+
+Old 
 ```{r sig substrate}
 sig_1_substrate <- cred_1_sig %>% 
   filter(!is.na(siltmud)| !is.na(sand)) 
@@ -2225,6 +2725,143 @@ uggggggg okay this isnt really showing anything
 Okay so I have messed with the excel file change_total a bit to pull out the significant variables and group the species based on their sig relationship with the env. that is all in the change_total csv and tab in the bigger excel document 
 
 ```{r}
+#getting cluster info 
+change_tot$egroups_1 <- ifelse(change_tot$E.x ==1, "cool, nonsaline, shallow, nosilt/mud, not_variable_sst, rugged", 
+                               ifelse(change_tot$E.x ==2, "cool, nonsaline, AMO+, NAO+, not_variable_bt, not_variable_sal, variable_sst", 
+                                      ifelse(change_tot$E.x==3, "saline, deep, AMO+, NAO+, not_variable_sal, variable_sst", 
+                                             ifelse(change_tot$E.x==4, "warm, nonsaline, shallow, nosilt/mud, nosand, variable_sst, rugged", NA))))
+
+change_tot$egroups_2 <- ifelse(change_tot$E.y ==1, "warm, saline, deep, no silt/mud, AMO_, variable_bt, variable_sal, rugged", 
+                               ifelse(change_tot$E.y ==2, "cool, nonsaline, deep, AMO+, NAO-, not_variable_bt, not_variable_sal", 
+                                      ifelse(change_tot$E.y==3, "cool, nonsaline, shallow, nosilt/mud, not_variable_sal, not_variable_sst, rugged", 
+                                             ifelse(change_tot$E.y==4, "warm, nonsaline, shallow, nosilt/mud, nosand, NAO-, variable_sal, rugged", NA))))
+
+change_tot$egroups_1 <- replace_na(change_tot$egroups_1, "not_caught")
+change_tot$egroups_2 <- replace_na(change_tot$egroups_2, "not_caught2")
+```
+
+```{r sankey egroups}
+dataSk <- data.frame(from = change_tot$egroups_1, to = change_tot$egroups_2 , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey salinity}
+dataSk <- data.frame(from = paste(change_tot$sal_1.x, "1"), to=paste(change_tot$sal_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey temp}
+dataSk <- data.frame(from = paste(change_tot$temp_1.x, "1"), to=paste(change_tot$temp_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "500",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey depth}
+dataSk <- data.frame(from = paste(change_tot$depth_1.x, "1"), to=paste(change_tot$depth_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "500",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey substrate}
+dataSk <- data.frame(from = paste(change_tot$siltmud_1.x, change_tot$sand_1.x, "1"), to=paste(change_tot$siltmud_1.y, change_tot$sand_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "1000",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey AMO}
+dataSk <- data.frame(from = paste(change_tot$AMO_1.x, "1"), to=paste(change_tot$AMO_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "500",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey NAO}
+dataSk <- data.frame(from = paste(change_tot$NAO_1.x, "1"), to=paste(change_tot$NAO_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "500",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey SD}
+dataSk <- data.frame(from = paste(change_tot$SD_bt_1.x, "1"), to=paste(change_tot$SD_bt_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "500",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey SD}
+dataSk <- data.frame(from = paste(change_tot$SD_sst_1.x, "1"), to=paste(change_tot$SD_sst_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "500",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey SD}
+dataSk <- data.frame(from = paste(change_tot$SD_sal_1.x, "1"), to=paste(change_tot$SD_sal_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "500",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r sankey SD}
+dataSk <- data.frame(from = paste(change_tot$SD_gebco_1.x, "1"), to=paste(change_tot$SD_gebco_1.y, "2") , Weight = .002)
+sankey <- gvisSankey(dataSk, from = "from", to="to", weight = "Weight", options=list(width = "500",
+                                 height = "500",
+                                 sankey="{
+                                 link: {colorMode: 'gradient', color: { fill: '#green' } },
+                                 node: {nodePadding: 20, width:30, color: { fill: '#a61d4c'} },
+                                 label: { color: '#871b47',fontSize: 50 } }"))
+plot(sankey)
+```
+
+```{r}
 Change_total <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/egroups_2.csv")
 library(googleVis)
 ```
@@ -2419,10 +3056,10 @@ plot(sankey)
 ```
 
 
-#"ATLANTOPANDALUS.PROPINQVUS","CANCER.PLEBEJUS", "CHACEON.QUINQUEDENS",
-#need to fix this because some things are spelled incorrectly etc 
-#specnames from Batt 2017
-# `Atlantopandalus propinqvus`, `Hippoglossoides platessoides`,`Hippoglossina oblonga`, `Leptoclinus maculatus`, `Lopholatilus chamaeleonticeps`, `Lumpenus lampretaeformis`, `Lycenchelys verrillii`, `Macrorhamphosus scolopax`, 
+"ATLANTOPANDALUS.PROPINQVUS","CANCER.PLEBEJUS", "CHACEON.QUINQUEDENS",
+need to fix this because some things are spelled incorrectly etc 
+specnames from Batt 2017
+ `Atlantopandalus propinqvus`, `Hippoglossoides platessoides`,`Hippoglossina oblonga`, `Leptoclinus maculatus`, `Lopholatilus chamaeleonticeps`, `Lumpenus lampretaeformis`, `Lycenchelys verrillii`, `Macrorhamphosus scolopax`, 
 ydata <- ydata %>% 
    select(`Acipenser oxyrinchus`, `Alosa aestivalis`, `Alosa pseudoharengus`, `Alosa sapidissima`, `Amblyraja radiata`, `Ammodytes dubius`, `Anarhichas lupus`, `Anchoa hepsetus`, `Anchoa mitchilli`, `Antigonia capros`, `Argentina silus`, `Argentina striata`, `Aspidophoroides monopterygius`,`Bairdiella chrysoura`, `Bathynectes longispina`, `Bathypolypus arcticus`, `Brevoortia tyrannus`, `Brosme brosme`, `Cancer borealis`, `Cancer plebejus`, `Carcharhinus plumbeus`, `Centropristis philadelphica`, `Centropristis striata`, `Chaceon quinquedens`, `Chionoecetes opilio`, `Chlorophthalmus agassizi`, `Citharichthys arctifrons`, `Clupea harengus`, `Conger oceanicus`, `Crangon septemspinosa`, `Cryptacanthodes maculatus`, `Cyclopterus lumpus`, `Cynoscion regalis`, `Dasyatis centroura`, `Dasyatis say`, `Decapterus punctatus`, `Dichelopandalus leptocerus`, `Dipturus laevis`, `Enchelyopus cimbrius`, `Etropus microstomus`, `Etrumeus teres(sadina)`, `Foetorepus agassizii`, `Gadus morhua`, `Glyptocephalus cynoglossus`, `Gymnura altavela`, `Helicolenus dactylopterus`, `Hemitripterus americanus`, `Hippoglossus hippoglossus`, `Homarus americanus`, `Illex illecebrosus`, `Lagodon rhomboides`, `Larimus fasciatus`, `Lebbeus polaris`, `Leiostomus xanthurus`, `Lepophidium profundorum`, `Leucoraja erinacea`, `Leucoraja garmani`, `Leucoraja ocellata`, `Limanda ferruginea`, `Limulus polyphemus`, `Liparis atlanticus`, `Lithodes maja`, `Loligo pealeii`, `Lolliguncula brevis`, `Lophius americanus`, `Malacoraja senta`, `Maurolicus weitzmani`, `Melanogrammus aeglefinus`, `Melanostigma atlanticum`, `Menidia menidia`, `Menticirrhus americanus`, `Menticirrhus saxatilis`, `Merluccius albidus`, `Merluccius bilinearis`, `Micropogonias undulatus`, `Monolene sessilicauda`, `Morone saxatilis`, `Mustelus canis`, `Myliobatis freminvillii`, `Myoxocephalus aenaeus`, `Myoxocephalus octodecemspinosus`, `Myxine glutinosa`, `Nemichthys scolopaceus`, `Ophidion marginatum`, `Osmerus mordax`, `Ovalipes ocellatus`, `Ovalipes stephensoni`, `Pandalus borealis`, `Pandalus montagui`, `Paralichthys dentatus`, `Parasudis truculenta`, `Pasiphaea multidentata`, `Peprilus triacanthus`, `Peristedion miniatum`, `Petromyzon marinus`, `Phycis chesteri`, `Placopecten magellanicus`, `Pollachius virens`, `Polymixia lowei`, `Pomatomus saltatrix`, `Pontinus longispinis`, `Pontophilus norvegicus`, `Prionotus alatus`, `Prionotus carolinus`, `Prionotus evolans`, `Pseudopleuronectes americanus`, `Raja eglanteria`, `Scomber scombrus`, `Scophthalmus aquosus`, `Scyliorhinus retifer`, `Sebastes fasciatus`, `Sicyonia brevirostris`, `Squalus acanthias`, `Squatina dumeril`, `Stenotomus chrysops`, `Syacium papillosum`, `Symphurus plagiusa`, `Synagrops bellus`, `Syngnathus fuscus`, `Synodus foetens`, `Synodus poeyi`, `Tautogolabrus adspersus`, `Trachinocephalus myops`, `Trachurus lathami`, `Trichiurus lepturus`, `Triglops murrayi`, `Trinectes maculatus`, `Ulvaria subbifurcata`, `Urophycis chuss`, `Urophycis regia`, `Urophycis tenuis`, `Zenopsis conchifera`, `Zoarces americanus`)
 
@@ -2454,5 +3091,112 @@ div <- glm(simp ~ surftemp + bottemp + botsalin + avgdepth + NAO_JFM + SD3x3shor
 ```
 
 
+#looping through GLM 
+```{r}
+#first time chunk 
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+#so I ran this with all of the SD types and the one that came out as much more important in the frist was the 3x3 short ones so I am going to rerun with just those for both time periods. 
+
+
+total <- subset(total, est_year < 2000)
+ydata <- total[,2:508]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+#need to do this here to see ones that werent caught early and are caught later 
+#now all of the unkown fish are outta there
+first_glm_results <- data.frame()
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+
+        ## capture summary stats
+        intercept <- coef(summary(fit))[1]
+        slope <- coef(summary(fit))[2]
+        p.value <- coef(summary(fit))[8]
+        AIC <- AIC(fit)
+        Deviance <- deviance(fit)
+
+        # get coefficents of fit
+        cfit <- coef(summary(fit))
+        cfit <- as.data.frame(cfit)
+        cfit$names <- paste(specnames[i], rownames(cfit), sep="_")
+        cfit$AIC <- AIC(fit)
+        cfit$Deviance <- deviance(fit)
+  
+       
+        first_glm_results <- rbind(results, cfit)
+    } 
+
+#second time chunk 
+
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+#so I ran this with all of the SD types and the one that came out as much more important in the frist was the 3x3 short ones so I am going to rerun with just those for both time periods. 
+
+
+total <- subset(total, est_year > 1999)
+ydata <- total[,2:508]
+ydata[is.na(ydata)] <- 0
+ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+#need to do this here to see ones that werent caught early and are caught later 
+#now all of the unkown fish are outta there
+# create data frame to store results
+second_glm_results <- data.frame()
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+
+        ## capture summary stats
+        intercept <- coef(summary(fit))[1]
+        slope <- coef(summary(fit))[2]
+        p.value <- coef(summary(fit))[8]
+        AIC <- AIC(fit)
+        Deviance <- deviance(fit)
+
+        # get coefficents of fit
+        cfit <- coef(summary(fit))
+        cfit <- as.data.frame(cfit)
+        cfit$names <- paste(specnames[i], rownames(cfit), sep="_")
+        cfit$AIC <- AIC(fit)
+        cfit$Deviance <- deviance(fit)
+  
+       
+        second_glm_results <- rbind(results, cfit)
+    } 
+
+
+#total 
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+
+
+# create data frame to store results
+tot_glm_results <- data.frame()
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+
+        ## capture summary stats
+        intercept <- coef(summary(fit))[1]
+        slope <- coef(summary(fit))[2]
+        p.value <- coef(summary(fit))[8]
+        AIC <- AIC(fit)
+        Deviance <- deviance(fit)
+
+        # get coefficents of fit
+        cfit <- coef(summary(fit))
+        cfit <- as.data.frame(cfit)
+        cfit$names <- paste(specnames[i], rownames(cfit), sep="_")
+        cfit$AIC <- AIC(fit)
+        cfit$Deviance <- deviance(fit)
+  
+       
+        tot_glm_results <- rbind(results, cfit)
+    } 
+```
 
 
