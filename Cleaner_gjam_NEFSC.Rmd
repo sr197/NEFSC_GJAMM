@@ -1417,6 +1417,7 @@ names <- rbind(names_1, names_2)
 names_rep <- names[duplicated(names$Var1),]
 specnames <- as.vector(names_rep$Var1)
 
+write.csv(specnames, file="specnames.csv")
 ```
 
 ```{r}
@@ -1817,6 +1818,11 @@ cred_1_sig_comb$convex_diff <- cred_1_sig_comb$convex_hull_second - cred_1_sig_c
 change_tot <- full_join(cred_1_sig_comb, cred_2_sig_comb, by="names")
 
 
+#save these files 
+write.csv(cred_tot_sig_comb, file= "cred_tot.csv")
+write.csv(cred_1_sig_comb, file= "cred_1.csv")
+write.csv(cred_2_sig_comb, file= "cred_2.csv")
+
 ```
 
 
@@ -1845,12 +1851,17 @@ cred_sub <- smartbind(cred_tot_sub1, cred_tot_sub12)
 ggplot(cred_sub, aes(x=dist_shifted, y=abs(sub))) +
     geom_point(shape=1) +    # Use hollow circles
     geom_smooth(method=lm)
+summary(glm(dist_shifted ~ abs(sub), data=cred_sub))
 
 ggplot(cred_sub, aes(x=convex_diff, y=abs(sub))) +
     geom_point(shape=1) +    # Use hollow circles
     geom_smooth(method=lm)
 
 ggplot(cred_sub, aes(x=rel_abd_diff, y=abs(sub))) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(cred_sub, aes(x=abd_diff, y=abs(sub))) +
     geom_point(shape=1) +    # Use hollow circles
     geom_smooth(method=lm)
 
@@ -3176,17 +3187,22 @@ xdata <- read.csv("xdata.csv")
 
 # create data frame to store results
 tot_glm_results <- data.frame()
+tot_glm_stand <- data.frame()
 
 for (i in 1:length(specnames)) { #for each species in spec_list
   fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
-
-        ## capture summary stats
+standardized <- lm.beta(fit)
+        
+  ## capture summary stats
         intercept <- coef(summary(fit))[1]
         slope <- coef(summary(fit))[2]
         p.value <- coef(summary(fit))[8]
         AIC <- AIC(fit)
         Deviance <- deviance(fit)
-
+        
+        sfit <- as.data.frame(t(standardized))
+        sfit$names <- specnames[i]
+  
         # get coefficents of fit
         cfit <- coef(summary(fit))
         cfit <- as.data.frame(cfit)
@@ -3195,8 +3211,538 @@ for (i in 1:length(specnames)) { #for each species in spec_list
         cfit$Deviance <- deviance(fit)
   
        
-        tot_glm_results <- rbind(results, cfit)
-    } 
+        tot_glm_results <- rbind(tot_glm_results, cfit)
+        tot_glm_stand <- rbind(tot_glm_stand, sfit)
+} 
+
+
+
+
+#total RF 
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+
+
+# create data frame to store results
+tot_rf_results <- data.frame()
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- randomForest(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total, ntree=300, na.action = na.omit)
+varimp <- importance(fit)
+
+        varfit <- as.data.frame(t(varimp))
+       varfit$names <- specnames[i]
+  
+        
+       
+        tot_rf_results <- rbind(tot_rf_results, varfit)
+} 
+
+
+```
+#gam
+````{r}
+#total gam 
+library(mgcv)
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+
+
+# create data frame to store results
+tot_gam_results <- data.frame()
+tot_gam_stand <- data.frame()
+tot_gam_dev <- data.frame()
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ avgdepth")), data=total)
+          fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total)
+           fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total)
+           fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total)
+           fit_NAO <- gam(as.formula(paste(specnames[i],"~ NAO_year")), data=total)   
+         fit_sed <- gam(as.formula(paste(specnames[i],"~ SED_TYPE")), data=total)
+         fit_sdsal <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsal")), data=total)
+         fit_sdbt <- gam(as.formula(paste(specnames[i],"~ SD3x3shortbt")), data=total) 
+          fit_sdsst <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsst")), data=total)
+        fit_geb <- gam(as.formula(paste(specnames[i],"~ gebco_SD_2")), data=total)
+        dev.depth <- summary(fit_depth)$dev.expl
+        dev.bt <- summary(fit_bt)$dev.expl
+        dev.sal <- summary(fit_sal)$dev.expl
+        dev.AMO <- summary(fit_AMO)$dev.expl
+        dev.NAO <- summary(fit_NAO)$dev.expl
+        dev.sed <- summary(fit_sed)$dev.expl
+        dev.sdsal <- summary(fit_sdsal)$dev.expl
+        dev.sdbt <- summary(fit_sdbt)$dev.expl
+        dev.sdsst <- summary(fit_sdsst)$dev.expl
+        dev.geb <- summary(fit_geb)$dev.expl
+        
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed, dev.sed, dev.sdsal, dev.sdbt, dev.sdsst, dev.geb)
+        dev_table <- as.data.frame(dev_table)
+        dev_table <- t(dev_table)
+        # get coefficents of fit
+        summary_model <- summary(fit)
+        p <- summary_model$p.table
+        
+        
+        cfit <- fit$coefficients
+        cfit <- as.data.frame(cfit)
+        cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        cfit$AIC <- AIC(fit)
+        cfit$Deviance <- dev_table
+        cfit$p_value <- p[,4]
+  
+       
+        tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+
 ```
 
+#deviance explained - kinda useless
+```{r}
+cred_dev_gam <- tot_gam_results %>% 
+separate(col=names, sep="([+])", into=c("names", "var"))
+cred_dev_gam <- cred_dev_gam[!(cred_dev_gam$p_value > .05),]
+  #this gets out all of the significant values 
+
+cred_dev_gam_2 <- cred_dev_gam%>% 
+  dplyr:::select(-AIC, -p_value, -cfit) %>% 
+  spread(var, value=Deviance)
+
+ix <- 2:13 
+cred_dev_gam_2[ix] <- lapply(cred_dev_gam_2[ix], as.numeric) 
+
+cred_dev_gam_2$strong <- colnames(cred_dev_gam_2)[apply(cred_dev_gam_2,1,which.max)]
+#MAX<-apply(cred_dev_gam_2[2:13], 1, max, na.rm=TRUE)
+
+#compare this to cred_order 
+check <- merge(x=cred_dev_gam_2, y=cred_order[, c("names", "strong")], by="names", all.x=TRUE)
+
+
+spec_info <- read.csv("specnames_withinfo.csv")
+cred_dev_gam_2 <- left_join(cred_dev_gam_2, spec_info, by="names")
+
+
+
+
+cred_dist <- cred_order %>% 
+  dplyr:::select(names, dist_shifted, convex_diff)
+
+cred_dev_gam_2 <- left_join(cred_dev_gam_2, cred_dist, by="names")
+                 
+cred_dev_gam_2$strong_2 <- ifelse(cred_dev_gam_2$strong == "SEDTYPESilt/Mud" | cred_dev_gam_2$strong == "SEDTYPESand", "substrate", ifelse(cred_dev_gam_2$strong == "bottemp", "bottemp", ifelse(cred_dev_gam_2$strong == "avgdepth", "depth", ifelse(cred_dev_gam_2$strong == "SD3x3shortsal" | cred_dev_gam_2$strong == "SD3x3shortsst" | cred_dev_gam_2$strong == "SD3x3shortsst", "variability", ifelse(cred_dev_gam_2$strong == "AMOunsmyear"| cred_dev_gam_2$strong == "NAOyear", "climate", NA)))))
+
+
+cred_dev_gam_2$strong_3 <- ifelse(cred_dev_gam_2$strong == "SEDTYPESilt/Mud" | cred_dev_gam_2$strong == "SEDTYPESand", "substrate", ifelse(cred_dev_gam_2$strong == "bottemp", "bottemp", NA))
+                                                                                           
+                 
+#run comaprison test and make boxplots 
+summary(aov(dist_shifted ~ strong, data=cred_dev_gam_2))
+summary(aov(dist_shifted ~ strong_2, data=cred_dev_gam_2))
+summary(lm(dist_shifted ~ strong_2, data=cred_dev_gam_2))
+
+
+
+kruskal.test(AMO_unsm_year ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+kruskal.test(avgdepth ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+kruskal.test(botsalin ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+kruskal.test(bottemp ~ as.factor(depth_saba_simp), data=cred_dev_gam_2) # yikes this isn't significant
+
+kruskal.test(gebco_SD_2 ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+kruskal.test(NAO_year ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+kruskal.test(SD3x3shortbt ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+kruskal.test(SD3x3shortsal ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+kruskal.test(SD3x3shortsst ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+kruskal.test(SED_TYPESand ~ as.factor(depth_saba_simp), data=cred_dev_gam_2)
+
+
+summary(lm(dist_shifted ~ bottemp, data=cred_dev_gam_2))
+
+#okay so sediment is significantly different between pelagic and benthic when we include p values that aren't significant and not when they arent. bottom temperature is never significant, ugh. 
+
+```
+
+
+#figures by specs 
+```{r}
+spec_info <- read.csv("specnames_withinfo.csv")
+cred_order <- left_join(cred_tot_sig_comb, spec_info, by="names")
+cred_order<-cred_order[!(cred_order$names=="Unknown.01" | cred_order$names=="Unknown.02"),]
+ggplot(cred_order, aes(x=dist_shifted, y=abs(bottemp), color=depth_profile)) +
+    geom_point(shape=1) 
+
+#summary(glm(dist_shifted ~ avgdepth + bottemp + botsalin + AMOunsmyear + NAOyear + `SEDTYPESilt/Mud` + SEDTYPESand + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebcoSD2, data=cred_order, na.action=na.exclude))
+
+
+
+#this makes one data frame with just the substrate variables combined 
+cred_sub1 <- cred_order %>% 
+  dplyr:::select(names, `SEDTYPESilt/Mud`, dist_shifted, convex_diff, rel_abd_diff, abd_diff, depth_profile, depth_saba_simp)
+cred_sub1$sub <- cred_sub1$`SEDTYPESilt/Mud`
+
+cred_sub <- cred_order %>% 
+  dplyr:::select(names, SEDTYPESand, dist_shifted, convex_diff, rel_abd_diff, abd_diff, depth_profile)
+cred_sub$sub <- cred_sub$SEDTYPESand
+cred_sub$names <- paste(cred_sub$names, "2", sep="")
+
+
+cred_sub2 <- smartbind(cred_sub1, cred_sub)
+
+ggplot(cred_sub2, aes(x=dist_shifted, y=abs(sub), color=depth_profile)) +
+    geom_point(shape=1) #+    # Use hollow circles
+    #\geom_smooth(method=lm)
+#summary(glm(dist_shifted ~ abs(sub), data=cred_sub2))
+
+
+
+```
+
+Okay, what if we took a species strongest relationship and mapped that number vs distance shifted and then categorized it (colored it) based on what the association is! 
+```{r}
+cred_strong <- cred_order[3:13] 
+cred_strong <- abs(cred_strong)
+cred_strong$strong <- colnames(cred_strong)[apply(cred_strong,1,which.max)]
+MAX<-apply(cred_strong[1:11], 1, max, na.rm=TRUE)
+
+cred_strong$strong_estimate <- MAX
+
+cred_order$strong_estimate <- MAX
+cred_order$strong <- cred_strong$strong
+
+ggplot(cred_order, aes(x=dist_shifted, y=abs(strong_estimate), color=strong)) +
+    geom_point(shape=1)
+
+ggplot(cred_order, aes(x=dist_shifted, y=strong, color=depth_saba_simp)) + 
+  geom_point()
+
+ggplot(cred_order, aes(x=dist_shifted, y=depth_saba)) + 
+  geom_point()
+
+ggplot(cred_order, aes(x=dist_shifted, y=names, color=depth_profile)) + 
+  geom_point()
+
+
+ggplot(cred_order, aes(x=convex_diff, y=names, color=depth_profile)) + 
+  geom_point()
+
+summary(lm(dist_shifted ~ strong, data=cred_order))
+
+cred_order$strong_2 <- ifelse(cred_order$strong == "SEDTYPESilt/Mud" | cred_order$strong == "SEDTYPESand", "substrate", ifelse(cred_order$strong == "bottemp", "bottemp", ifelse(cred_order$strong == "avgdepth", "depth", ifelse(cred_order$strong == "SD3x3shortsal" | cred_order$strong == "SD3x3shortsst" | cred_order$strong == "SD3x3shortsst", "variability", ifelse(cred_order$strong == "AMOunsmyear"| cred_order$strong == "NAOyear", "climate", NA)))))
+
+
+cred_order$strong_3 <- ifelse(cred_order$strong == "SEDTYPESilt/Mud" | cred_order$strong == "SEDTYPESand", "substrate", ifelse(cred_order$strong == "bottemp", "bottemp", NA))
+                                                                                                                               
+summary(lm(dist_shifted ~ strong_2, data=cred_order))
+#if only this was significant
+
+
+
+ggplot(cred_order, aes(x=dist_shifted, y=strong_2, color=depth_saba)) + 
+  geom_point()
+
+ggplot(cred_order, aes(x=dist_shifted, y=depth_saba_simp, color=strong_3)) + 
+  geom_point()
+
+
+kruskal.test(dist_shifted ~ as.factor(strong_2), data=cred_order)
+pairwise.wilcox.test(cred_order$dist_shifted,  as.factor(cred_order$strong_2))
+
+#okay so p is .1 here which could mean there is a significant difference between species that have substrate as their strongest variable vs species that have bt as their strongest variable in terms of their distance shifted. 
+
+summary(lm(dist_shifted ~ strong_2, data=cred_order))
+###Okay if I am interpreting this correctly than there is a significant relationship between distance shifted and the factor (either bt or substrate) as the most significant variable. Right?? 
+
+
+summary(anovaD)
+TukeyHSD(anovaD)
+```
+#standardizing ggplot 
+```{r}
+ggtheme_Plot <- function() {
+  theme(
+    plot.title = element_text(size = rel(1), hjust = 0, face = "bold"),
+    panel.background = element_blank(),
+    strip.background = element_blank(),
+    # strip.text       = element_text(size = base_size, face = "italic"),
+    panel.border     = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x = element_text(size = 18,
+                               angle = 0,
+                               face = "plain"),
+    axis.text.y = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    legend.key = element_rect(colour = NA, fill = NA),
+    legend.position  = "top",
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 18),
+    strip.text.x = element_text(size = 18),
+    strip.text = element_text(size = 18)
+  )
+}
+
+```
+
+#assumptions of normality 
+```{r}
+source("http://goo.gl/UUyEzD")
+outlierKD(cred_order, avgdepth)
+
+qqnorm(cred_order$bottemp)
+qqline(cred_order$bottemp)
+
+
+#homogeneity of variances 
+fligner.test(dist_shifted~depth_saba_simp, data=cred_order)
+bartlett.test(dist_shifted~depth_saba_simp, data=cred_order)
+library(car)
+leveneTest(dist_shifted~depth_saba_simp, data=cred_order)
+leveneTest(dist_shifted~depth_saba_simp, data=cred_order)
+
+#if p is significant, means there is difference in variances between groups and can't use ANOVA 
+```
+
+#lets try an anova 
+```{r}
+
+anovaD <- aov(dist_shifted ~ depth_saba_simp, data=cred_order)
+summary(anovaD) #sig
+TukeyHSD(anovaD)
+
+anovaD <- aov(dist_shifted ~ strong_2, data=cred_order)
+summary(anovaD) #sig
+TukeyHSD(anovaD)
+
+anovaD <- aov(dist_shifted ~ strong_3, data=cred_order)
+summary(anovaD) #sig
+TukeyHSD(anovaD)
+
+anovaD <- aov(convex_diff ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD) #sig
+
+anovaD <- aov(abd_diff ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+anovaD <- aov(rel_abd_diff ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+anovaD <- aov(abs(bottemp) ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD) #sig
+
+anovaD <- aov(abs(AMOunsmyear) ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+anovaD <- aov(abs(avgdepth) ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+anovaD <- aov(abs(botsalin) ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+anovaD <- aov(abs(NAOyear) ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+anovaD <- aov(abs(SD3x3shortbt) ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+anovaD <- aov(abs(SD3x3shortsal) ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+anovaD <- aov(abs(SD3x3shortsst) ~ depth_saba_simp, data=cred_order)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+cred_sub$depth_profile_simp <- cred_order$depth_profile_simp
+cred_sub$depth_profile <- cred_order$depth_profile
+cred_sub$depth_saba <- cred_order$depth_saba
+cred_sub$depth_saba_simp <- cred_order$depth_saba_simp
+
+anovaD <- aov(abs(sub) ~ depth_saba_simp, data=cred_sub2)
+summary(anovaD)
+TukeyHSD(anovaD)
+
+#okay so there is a significant difference between the pelagic and demersal species and distance shifted. as well as a significant distance between pelagic and demersal and strength of bottemp association as well as AMO, NAO and SD bt. Unofturnately, non significant difference with substrate or rugosity or depth.  
+#maybe group into even smaller groups (pelagic vs demersal/benthic)
+
+#this is the test that Saba et al used (this is non-parametric because data isnt normally distributed, but I have a largeish sample size so might be able use the ANOVA: 
+#https://blog.minitab.com/blog/adventures-in-statistics-2/choosing-between-a-nonparametric-test-and-a-parametric-test)
+#all the same things as above are significant 
+
+kruskal.test(rel_abd_diff ~ depth_saba_simp, data=cred_order) 
+kruskal.test(convex_diff ~ depth_saba_simp, data=cred_order)
+kruskal.test(abd_diff ~ depth_saba_simp, data=cred_order)
+kruskal.test(dist_shifted ~ depth_saba_simp, data=cred_order) #sig
+kruskal.test(dist_shifted ~ factor(strong), data=cred_order) #.07
+kruskal.test(dist_shifted ~ factor(strong_2), data=cred_order) 
+kruskal.test(dist_shifted ~ factor(strong_3), data=cred_order) 
+
+t.test(dist_shifted ~ factor(strong_3), alternative = "greater", data=cred_order)
+
+t.test(dist_shifted ~ factor(depth_saba_simp), alternative = "less" , data=cred_order)
+
+
+
+#then use this test to see which groups are different
+pairwise.wilcox.test(cred_order$dist_shifted, cred_order$strong_3)
+pairwise.wilcox.test(cred_order$dist_shifted, cred_order$depth_saba_simp)
+pairwise.wilcox.test(cred_order$convex_diff, cred_order$depth_saba_simp)
+pairwise.wilcox.test(abs(cred_order$bottemp), cred_order$depth_saba_simp)
+pairwise.wilcox.test(abs(cred_sub2$sub), cred_sub2$depth_saba_simp)
+
+
+
+#if unequal variances can run welch anova 
+oneway.test(dist_shifted ~ depth_saba_simp, data=cred_order)
+oneway.test(dist_shifted ~ strong_3, data=cred_order)
+
+summary(lm(dist_shifted ~ depth_saba_simp, data=cred_order))
+summary.aov(lm(dist_shifted ~ depth_saba_simp, data=cred_order))
+
+summary(lm(convex_diff ~ depth_saba_simp, data=cred_order))
+
+summary(lm(dist_shifted ~ strong_2, data=cred_order))
+summary.aov(lm(dist_shifted ~ strong_2, data=cred_order))
+
+summary(lm(abs(bottemp) ~ depth_saba_simp, data=cred_order))
+
+
+#pelagic <- subset(cred_order, cred_order$depth_saba_simp=="pelagic")
+#demersal <- subset(cred_order, cred_order$depth_saba_simp=="demersal")
+
+#summary(lm(dist_shifted ~ bottemp, data=pelagic))
+
+write.csv(cred_order, file="cred_order.csv")
+
+ggplot(data=cred_order, aes(x=depth_saba_simp, y=dist_shifted, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "distance shifted", x = "species type") + 
+  theme_classic()
+
+ggplot(data=cred_order, aes(x=depth_saba_simp, y=convex_diff, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "range difference", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=cred_order, aes(x=strong_2, y=dist_shifted, fill=strong_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=cred_order, aes(x=depth_saba_simp, y=abs(bottemp), fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "strength of BT", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=cred_sub2, aes(x=depth_saba_simp, y=abs(sub), fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "strength of substrate", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=cred_order, aes(x=depth_saba_simp, y=strong_)) + geom_point()
+
+
+
+ggplot(data=subset(cred_order, !is.na(strong_2)), aes(x= strong_2,  group=depth_saba_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_grid(~depth_saba_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+  ggtheme_Plot()
+
+ggsave("barplot.jpeg", plot = last_plot())
+
+```
+#glm results
+
+```{r}
+cred_order_glm <- cred_order %>% 
+  dplyr:::select(names, dist_shifted, convex_diff, rel_abd_diff)
+
+cred_order_glm <- left_join(cred_order_glm, tot_glm_stand)
+
+spec_info <- read.csv("specnames_withinfo.csv")
+cred_order_glm <- left_join(cred_order_glm, spec_info, by="names")
+
+cred_glm_strong <- cred_order_glm[5:15] 
+cred_glm_strong <- abs(cred_glm_strong)
+cred_glm_strong$strong <- colnames(cred_glm_strong)[max.col(cred_glm_strong,ties.method="first")] 
+
+
+######nope this doesnt work cause for some reason sst variability is alway sthe most important variable for each species. 
+cred_order_glm$strong <- cred_glm_strong$strong
+
+cred_order_glm$strong_2 <- ifelse(cred_order_glm$strong == "SEDTYPESilt/Mud" | cred_order_glm$strong == "SEDTYPESand", "substrate", ifelse(cred_order_glm$strong == "bottemp", "bottemp", ifelse(cred_order_glm$strong == "avgdepth", "depth", ifelse(cred_order_glm$strong == "SD3x3shortsal" | cred_order_glm$strong == "SD3x3shortsst" | cred_order_glm$strong == "SD3x3shortsst", "variability", ifelse(cred_order_glm$strong == "AMOunsmyear"| cred_order_glm$strong == "NAOyear", "climate", NA)))))
+
+
+cred_order_glm$strong_3 <- ifelse(cred_order_glm$strong == "SEDTYPESilt/Mud" | cred_order_glm$strong == "SEDTYPESand", "substrate", ifelse(cred_order_glm$strong == "bottemp", "bottemp", NA))
+
+
+summary(glm(dist_shifted ~ abs(avgdepth) + abs(bottemp) + abs(botsalin) + abs(AMO_unsm_year) + abs(NAO_year) + abs(`SED_TYPESilt/Mud`) + abs(SED_TYPESand) + abs(SD3x3shortsal) + abs(SD3x3shortbt) + abs(SD3x3shortsst) + abs(gebco_SD_2), data=cred_order_glm)) #this would be awesome if it was significant 
+
+summary(glm(convex_diff ~ abs(avgdepth) + abs(bottemp) + abs(botsalin) + abs(AMO_unsm_year) + abs(NAO_year) + abs(`SED_TYPESilt/Mud`) + abs(SED_TYPESand) + abs(SD3x3shortsal) + abs(SD3x3shortbt) + abs(SD3x3shortsst) + abs(gebco_SD_2), data=cred_order_glm))
+
+
+
+anovaD <- aov(dist_shifted ~ depth_saba_simp, data=cred_order_glm)
+summary(anovaD) #sig
+TukeyHSD(anovaD)
+
+anovaD <- aov(dist_shifted ~ strong_2, data=cred_order_glm)
+summary(anovaD) #sig
+TukeyHSD(anovaD)
+
+anovaD <- aov(dist_shifted ~ strong_3, data=cred_order_glm)
+summary(anovaD) #sig
+TukeyHSD(anovaD)
+
+anovaD <- aov(convex_diff ~ depth_saba_simp, data=cred_order_glm)
+summary(anovaD)
+TukeyHSD(anovaD) #sig
+
+#rf
+cred_rf <- cred_tot_sig_comb %>% 
+  dplyr:::select(names, dist_shifted, convex_diff, rel_abd_diff, abd_diff)
+
+cred_order_rf <- left_join(cred_rf, tot_rf_results)
+
+spec_info <- read.csv("specnames_withinfo.csv")
+cred_order_rf <- left_join(cred_order_rf, spec_info, by="names")
+
+summary(glm(dist_shifted ~ abs(avgdepth) + abs(bottemp) + abs(botsalin) + abs(AMO_unsm_year) + abs(NAO_year) + abs(SED_TYPE) + abs(SD3x3shortsal) + abs(SD3x3shortbt) + abs(SD3x3shortsst) + abs(gebco_SD_2), data=cred_order_rf))
+
+
+ggplot(cred_order_rf, aes(x=SED_TYPE, y=dist_shifted))+
+  geom_point()
+#this would be awesome if it was significant 
+
+
+```
 
