@@ -85,7 +85,7 @@ total <- total %>%
   filter(est_year>1984)
 total$myid <- 1:22950
 #the original id was wacky
-
+total_full <- total
 write.csv(total, file="total.csv")
 
 total_latlondate <- total %>% 
@@ -295,9 +295,10 @@ xdata <- read.csv("xdata.csv")
 
 #first time chunk 
 total <- subset(total, est_year < 2000)
-ydata <- total[,2:508]
+ydata <- total[,3:509]
 ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+ycommon_1 <- as.vector(colnames(ycommon))
 #need to do this here to see ones that werent caught early and are caught later 
 #now all of the unkown fish are outta there
 
@@ -382,9 +383,10 @@ xdata <- read.csv("xdata.csv")
 
 #first time chunk 
 total <- subset(total, est_year > 1999)
-ydata <- total[,2:508]
+ydata <- total[,3:509]
 ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
+ycommon_2 <- as.vector(colnames(ycommon))
 #need to do this here to see ones that werent caught early and are caught later 
 #now all of the unkown fish are outta there
 
@@ -464,7 +466,7 @@ xdata <- read.csv("xdata.csv")
 #so I ran this with all of the SD types and the one that came out as much more important in the frist was the 3x3 short ones so I am going to rerun with just those for both time periods. 
 
 #total time chunk 
-ydata <- total[,2:508]
+ydata <- total[,3:509]
 ydata[is.na(ydata)] <- 0
 ycommon <- gjamTrimY(ydata, 100, OTHER=F)$y
 #need to do this here to see ones that werent caught early and are caught later 
@@ -498,13 +500,13 @@ out <- gjam(~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYP
 
 save(out, file='out_full_82_15.Rdata')
 load('out_full_82_15.Rdata')
-plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T)
+plotPars <- list(SMALLPLOTS = T, GRIDPLOTS=T, PLOTALLY = T, SAVEPLOTS=T)
 gjamPlot(out, plotPars=plotPars)
 
 DIC_tot <- out$fit$DIC         # DIC
 rmspe_tot <- out$fit$rmspeAll    # root mean squared prediction error for all species
-rmspe_spec_tot <- out$fit$rmspeBySpec # RMSPE for each species
-
+rmspe_spec_tot <- as.data.frame(out$fit$rmspeBySpec) # RMSPE for each species
+rmspe_spec_tot$spec <- rownames(rmspe_spec_tot)
 VIF_tot <- out$inputs$designTable               # VIF for each predictor
 beta_tot <- out$parameters$betaMu                # mean beta for each species and predictor
 cred_tot <- out$parameters$betaStandXTable # credible interval for each species and predictor
@@ -520,6 +522,46 @@ cred_tot$names <- rownames(cred_tot)
 cred_tot_sig <- cred_tot %>% 
   filter(sig95 == "*") %>% 
   filter(!grepl('intercept', names))  #remove anything that says intercept in there 
+
+
+#function to calculate R2 
+
+preds <- out$prediction$ypredMu
+actual <- ycommon
+rsq_dat <- data.frame(matrix(nrow=193, ncol=6))
+rsq_dat$spec <- colnames(ycommon)
+names <- colnames(ycommon)
+for (i in 1:length(ycommon)) {
+  rss <- sum((preds[,i] - actual[,i]) ^ 2)  ## residual sum of squares
+  tss <- sum((actual[,i] - mean(actual[,i])) ^ 2)  ## total sum of squares
+  rsq_1 <- 1 - (rss/tss)
+  
+  # 2.1. Average of actual data
+avr_y_actual <- mean(actual[,i])
+
+# 2.2. Total sum of squares
+ss_total <- sum((actual[,i] - avr_y_actual)^2)
+
+# 2.3. Regression sum of squares
+ss_regression <- sum((preds[,i] - avr_y_actual)^2)
+
+# 2.4. Residual sum of squares
+ss_residuals <- sum((actual[,i] - preds[,i])^2)
+name <- name[i]
+# 3. R2 Score
+rsq <- 1 - (ss_residuals / ss_total)
+#rsq_dat[i,1] <- name
+rsq_dat[i,2] <- rsq
+rsq_dat[i,3] <- rsq_1 #these should be the same
+summary_stats <- postResample(pred = preds[,i], obs = actual[,i])
+rsq_dat[i,4] <-  summary_stats[1]
+rsq_dat[i,5] <-  summary_stats[2]
+rsq_dat[i,6] <-  summary_stats[3]
+}
+colnames(rsq_dat) <- c("blank", "r2", "r2_2", "rmse", "r2_3", "MAE", "spec")
+rsq_dat <- left_join(rsq_dat, rmspe_spec_tot, by="spec")
+rsq_dat_total <- rsq_dat
+write.csv(rsq_dat_total, file="summary_stats_total_model.csv")
 ```
 
 
@@ -1364,6 +1406,101 @@ Okay so we could have a few things happening.
 
 I also have to go through and see if species were not caught (or not caught enought to be included in our gjam analysis) or if the relationship with the environment just wasn't significant. doing that now by highlihgting the ones with no significance in first then something significant in second and looking at all of the gjam beta outputs . 
 
+#determining which specs 
+```{r}
+
+total <- read.csv("total.csv")
+names(total)<-make.names(names(total),unique = TRUE)
+total_1 <- subset(total, est_year < 2000)
+sums_1 <- colSums(total_1[7:513])
+names_1_sum <- rbind(colnames(total_1[7:513]), sums_1)
+
+total_2 <- subset(total, est_year > 1999)
+sums_2 <- colSums(total_2[7:513])
+names_2_sum <- rbind(colnames(total_2[7:513]), sums_2)
+
+sum_tot <- rbind(names_1_sum, names_2_sum)
+sum_tot <- t(sum_tot)
+sum_tot <- as.data.frame(sum_tot)
+
+sum_tot$sums_1 <- as.numeric(sum_tot$sums_1)
+sum_tot$sums_2 <- as.numeric(sum_tot$sums_2)
+
+sum_tot_nozero <-sum_tot[ which(sum_tot$sums_1!=0 
+& sum_tot$sums_2!=0 ), ]
+
+
+
+
+fall_catch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22560_FSCSTables_Fall/22560_UNION_FSCS_SVCAT.csv")
+fall_x <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22560_FSCSTables_Fall/22560_UNION_FSCS_SVSTA.csv")
+
+spring_catch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22561_FSCSTables_spring/22561_UNION_FSCS_SVCAT.csv")
+spring_x <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22561_FSCSTables_spring/22561_UNION_FSCS_SVSTA.csv")
+
+#manipulated the catch data to be in tidy format 
+fall_catch$id <- as.numeric(as.character(fall_catch$id))
+
+#joining the tables 
+fall_x$id <- as.numeric(as.character(fall_x$id))
+
+fall_test <- left_join(fall_catch, fall_x, by="id")
+fall_test <- fall_test %>% dplyr:::select(id, expcatchnum, scientific_name, est_year, est_month )
+
+
+spring_catch$id <- as.numeric(as.character(spring_catch$id))
+
+#joining the tables 
+spring_x$id <- as.numeric(as.character(spring_x$id))
+
+spring_test <- left_join(spring_catch, spring_x, by="id")
+spring_test <- spring_test %>% dplyr:::select(id, expcatchnum, scientific_name, est_year, est_month )
+
+tot_test <- rbind(spring_test, fall_test)
+
+tot_test_1 <- subset(tot_test, est_year < 2000) 
+
+tot_test_2 <- subset(tot_test, est_year > 1999)
+
+#which species are present in multiple months in both time periods
+tot_1_m <- tot_test_1 %>% group_by(scientific_name) %>% 
+  summarise(
+  months = length(unique(est_month)))
+
+tot_2_m <- tot_test_2 %>% group_by(scientific_name) %>% 
+  summarise(
+  months = length(unique(est_month)))
+
+tot_by_m <- left_join(tot_1_m, tot_2_m, by="scientific_name")
+tot_by_m$scientific_name <- gsub(" ", ".", tot_by_m$scientific_name)
+tot_by_m$scientific_name <- gsub("\\(", ".", tot_by_m$scientific_name)
+tot_by_m$scientific_name <- gsub("\\)", ".", tot_by_m$scientific_name)
+tot_by_m$scientific_name <- gsub("\\-", ".", tot_by_m$scientific_name)
+
+write.csv(tot_by_m, file="total_months.csv")
+tot_m_6 <- subset(tot_by_m, tot_by_m$months.x>5 & tot_by_m$months.y>5)
+
+tot_m_5 <- subset(tot_by_m, tot_by_m$months.x>4 & tot_by_m$months.y>4)
+
+specnames_6 <- as.vector(tot_m_6$scientific_name)
+specnames_5 <- as.vector(tot_m_5$scientific_name)
+
+tot_6_orig <- left_join(tot_m_6, specnames_orig, by=c("scientific_name"="specNames"))
+
+ycommon_all <- as.data.frame(ycommon_2)
+ycommon_all$two <- 1
+ycommon_1 <- as.data.frame(ycommon_1)
+ycommon_1$one <-1
+ycommon_all <- left_join(ycommon_all, ycommon_1, by =c("ycommon_2"= "ycommon_1"))
+
+specnames_6 <- as.data.frame(specnames_6)
+specnames_6$sixmo <- 1
+ycommon_all <- left_join(ycommon_all, specnames_6, by =c("ycommon_2"= "specnames_6"))
+
+
+sum_m_spec <- ycommon_all[ycommon_all$ycommon_2 %in% specnames_6,] 
+
+```
 
 
 #Shfiting ENV 
@@ -1382,16 +1519,57 @@ this makes the dataset a spatial object
 total <- read.csv("total.csv")
 ydata <- read.csv("ydata.csv")
 xdata <- read.csv("xdata.csv")
-total_sp <- total
+
+total_for_sp <- total
+names(total)<-make.names(names(total),unique = TRUE)
+total_sp <- total_for_sp
 coordinates(total_sp) <- ~ decdeg_beglon + decdeg_beglat
 
 
 #Lets select out the time period chunks we need. 
 total_sp_1 <- subset(total, est_year < 2000)
-total_sp_2 <- subset(total, est_year > 1999)
-total_sp_85_90 <- subset(total, est_year < 1991)
-total_sp_12_17 <- subset(total, est_year > 2011)
+#trying to figure out if the 137 species i am using are present in all of these 
+total_1 <- subset(total, est_year < 2000)
+sums_1 <- colSums(total_1[7:513])
+names_1_sum <- rbind(colnames(total_1[7:513]), sums_1)
 
+#second time period 
+total_2 <- subset(total, est_year > 1999)
+sums_1 <- colSums(total_1[7:513])
+names_1_sum <- rbind(colnames(total_1[7:513]), sums_1)
+
+total_sp_2 <- subset(total, est_year > 1999)
+sums_2 <- colSums(total_2[7:513])
+names_2_sum <- rbind(colnames(total_2[7:513]), sums_2)
+
+sum_tot <- rbind(names_1_sum, names_2_sum)
+sum_tot <- t(sum_tot)
+specnames_small <-specnames
+specNames <- cred_order$names
+specnames_orig <- as.data.frame(specNames)
+specnames_orig$dot <- 1
+sum_tot <- as.data.frame(sum_tot)
+
+sum_tot_nozero <-sum_tot[ which(sum_tot$sums_1!=0 
+& sum_tot$sums_2!=0 ), ]
+
+sum_tot$sums_1 <- as.numeric(sum_tot$sums_1)
+sum_tot$sums_2 <- as.numeric(sum_tot$sums_2)
+
+sum_tot_twenty <-sum_tot[ which(sum_tot$sums_1 > 49 
+& sum_tot$sums_2 > 49 ), ]
+
+sum_tot_with_orig <- left_join(sum_tot, specnames_orig, by=c("V1"="specNames"))
+
+specnames_large <- as.vector(sum_tot_nozero$V1)
+#total_sp_85_90 <- subset(total, est_year < 1991)
+#total_sp_12_17 <- subset(total, est_year > 2011)
+
+sum_tot_spec <- sum_tot_nozero[sum_tot_nozero$V1 %in% specNames,] 
+
+sum_tot_spec_2 <- sum_tot_twenty[sum_tot_twenty$V1 %in% specNames,] 
+
+specNames <- as.vector(sum_tot_spec$V1)
 
 #now make all of those spatial objects: 
 
@@ -1410,14 +1588,31 @@ Now we can only do this for species that were duplicated in all of them. I went 
 lets find which species were in both the cred_1_sig and cred_2_sig columns: 
 
 ```{r}
+
 names_1 <- data.frame(table(cred_1_sig$names))
+names_1 <- names_1 %>% separate(col=Var1, sep="([_])", into=c("names", "var"))
+names_1 <- names_1 %>%  group_by(names) %>% 
+  summarise(
+  freq = mean(freq))
+  
+
+
 names_2 <- data.frame(table(cred_2_sig$names))
+names_2 <- names_2 %>% separate(col=Var1, sep="([_])", into=c("names", "var"))
+names_2 <- names_2 %>%  group_by(names) %>% 
+  summarise(
+  freq = mean(freq))
+  
+
+
 
 names <- rbind(names_1, names_2)
-names_rep <- names[duplicated(names$Var1),]
+names_rep <- names[duplicated(names$names),]
 specnames <- as.vector(names_rep$Var1)
 
 write.csv(specnames, file="specnames.csv")
+
+#actually use specnames_large here 
 ```
 
 ```{r}
@@ -1444,7 +1639,7 @@ specnames_1<-c("Alosa_aestivalis_.blueback_herring.", "Alosa_pseudoharengus_.ale
 
 
 specnames_2 <- c("Menticirrhus_saxatilis_.northern_kingfish.", "Merluccius_bilinearis_.silver_hake.", "Micropogonias_undulatus_.Atlantic_croaker.", "Morone_saxatilis_.striped_bass.", "Mustelus_canis_.smooth_dogfish.", "Myctophidae", "Myliobatis_freminvillii_.bullnose_ray.", "Myoxocephalus_octodecemspinosus_.longhorn_sculpin.", "Opisthonema_oglinum_.Atlantic_thread_herring.", "Orthopristis_chrysoptera_.pigfish.", "Ovalipes_ocellatus_.lady_crab.", "Ovalipes_stephensoni_.coarsehand_lady_crab.", "Pandalus_borealis_.northern_shrimp.", "Pandalus_montagui_.Aesop_shrimp.", "Paralichthys_dentatus_.summer_flounder.", "Pasiphaea_multidentata_.pink_glass_shrimp.", "Penaeus", "Peprilus_triacanthus_.butterfish.", "Phycis_chesteri_.longfin_hake.", "Placopecten_magellanicus_.sea_scallop.", "Pollachius_virens_.pollock.", "Pomatomus_saltatrix_.bluefish.", "Prionotus_carolinus_.northern_searobin.", "Prionotus_evolans_.striped_searobin.", "Pseudopleuronectes_americanus_.winter_flounder.", "Raja_eglanteria_.clearnose_skate.", "Sardinella_aurita_.Spanish_sardine.", "Scomber_scombrus_.Atlantic_mackerel.", "Scophthalmus_aquosus_.windowpane.", "Sebastes_fasciatus_.Acadian_redfish.", "Selene_setapinnis_.Atlantic_moonfish.", "Sphoeroides_maculatus_.northern_puffer.", "Squalus_acanthias_.spiny_dogfish.", "Stenotomus_chrysops_.scup.", "Stephanolepis_hispida_.planehead_filefish.", "Synodus_foetens_.inshore_lizardfish.", "Trachurus_lathami_.rough_scad.", "Triglops_murrayi_.moustache_sculpin.", "Urophycis_chuss_.red_hake.", "Urophycis_regia_.spotted_hake.", "Urophycis_tenuis_.white_hake.", "Zoarces_americanus_.ocean_pout.")
-specnames <- c(specnames_1, specnames_2)
+specnames_test <- c(specnames_1, specnames_2)
 
 #second iteration, 5 year chunks 
 #for the second iteration of running the model 
@@ -1460,10 +1655,11 @@ weighted centroid
 ```{r weighted centroid}
 #first time chunk 
 
-spec_coords_1 <- data.frame(name=rep(0,89), x=rep(0,89), y=rep(0,89))
-for (i in 1:89) { #for each species in spec_list
-  wt.try <- wt.centroid(total_sp_1, specnames[i])
-  name <- specnames[i]
+spec_coords_1 <- data.frame(name=rep(0,133), x=rep(0,133), y=rep(0,133))
+
+for (i in 1:length(specnames_6)) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_1, specnames_6[i])
+  name <- specnames_6[i]
   xcord <- wt.try@coords[1]
   ycord <- wt.try@coords[2] 
   spec_coords_1[i,] = c(name, xcord, ycord)
@@ -1471,10 +1667,10 @@ for (i in 1:89) { #for each species in spec_list
 
 #For the 2nd time chunk
 
-spec_coords_2 <- data.frame(name=rep(0,89), x=rep(0,89), y=rep(0,89))
-for (i in 1:89) { #for each species in spec_list
-  wt.try <- wt.centroid(total_sp_2, specnames[i])
-  name <- specnames[i]
+spec_coords_2 <- data.frame(name=rep(0,133), x=rep(0,133), y=rep(0,133))
+for (i in 1:length(specNames)) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_2, specNames[i])
+  name <- specNames[i]
   xcord <- wt.try@coords[1]
   ycord <- wt.try@coords[2] 
   spec_coords_2[i,] = c(name, xcord, ycord)
@@ -1536,15 +1732,15 @@ this calculates the geodesic distance between the two points
 ```{r geodesic distance}
 
 dist_total <- as.data.frame(distGeo(spec_coords_1[2:3], spec_coords_2[2:3]))
-dist_total <- cbind(specnames, dist_total)
+dist_total <- cbind(specNames, dist_total)
 dist_total <- cbind(dist_total, spec_coords_1)
 dist_total <- cbind(dist_total, spec_coords_2)
 
-write.csv(dist_total, "dist_total_full.csv")
+write.csv(dist_total, "dist_total_full_2.csv")
 
 #lets save all of the mean centroid coordinates to map later
-write.csv(spec_coords_1, "spec_coords_1_full.csv")
-write.csv(spec_coords_2, "spec_coords_2_full.csv")
+write.csv(spec_coords_1, "spec_coords_1_full_2.csv")
+write.csv(spec_coords_2, "spec_coords_2_full_2.csv")
 
 #for 5 year chunks
 dist_total_5yr <- as.data.frame(distGeo(spec_coords_85_90[2:3], spec_coords_12_17[2:3]))
@@ -3384,8 +3580,10 @@ ggplot(cred_order, aes(x=dist_shifted, y=abs(bottemp), color=depth_profile)) +
 
 #summary(glm(dist_shifted ~ avgdepth + bottemp + botsalin + AMOunsmyear + NAOyear + `SEDTYPESilt/Mud` + SEDTYPESand + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebcoSD2, data=cred_order, na.action=na.exclude))
 
+#distance info 
+cred_dist <- read.csv("dist_info.csv")
 
-
+cred_order <- left_join(cred_order, cred_dist)
 #this makes one data frame with just the substrate variables combined 
 cred_sub1 <- cred_order %>% 
   dplyr:::select(names, `SEDTYPESilt/Mud`, dist_shifted, convex_diff, rel_abd_diff, abd_diff, depth_profile, depth_saba_simp)
@@ -3506,10 +3704,10 @@ qqline(cred_order$bottemp)
 
 #homogeneity of variances 
 fligner.test(dist_shifted~depth_saba_simp, data=cred_order)
-bartlett.test(dist_shifted~depth_saba_simp, data=cred_order)
+bartlett.test(dist~depth_saba, data=cred_order)
 library(car)
-leveneTest(dist_shifted~depth_saba_simp, data=cred_order)
-leveneTest(dist_shifted~depth_saba_simp, data=cred_order)
+leveneTest(dist~depth_saba, data=cred_order)
+leveneTest(dist~depth_profile_simp, data=cred_order)
 
 #if p is significant, means there is difference in variances between groups and can't use ANOVA 
 ```
@@ -3517,7 +3715,7 @@ leveneTest(dist_shifted~depth_saba_simp, data=cred_order)
 #lets try an anova 
 ```{r}
 
-anovaD <- aov(dist_shifted ~ depth_saba_simp, data=cred_order)
+anovaD <- aov(dist ~ depth_profile_simp, data=cred_order)
 summary(anovaD) #sig
 TukeyHSD(anovaD)
 
@@ -3589,13 +3787,21 @@ TukeyHSD(anovaD)
 #https://blog.minitab.com/blog/adventures-in-statistics-2/choosing-between-a-nonparametric-test-and-a-parametric-test)
 #all the same things as above are significant 
 
+
+
 kruskal.test(rel_abd_diff ~ depth_saba_simp, data=cred_order) 
 kruskal.test(convex_diff ~ depth_saba_simp, data=cred_order)
 kruskal.test(abd_diff ~ depth_saba_simp, data=cred_order)
 kruskal.test(dist_shifted ~ depth_saba_simp, data=cred_order) #sig
 kruskal.test(dist_shifted ~ factor(strong), data=cred_order) #.07
-kruskal.test(dist_shifted ~ factor(strong_2), data=cred_order) 
+kruskal.test(dist_shifted ~ factor(strong_2), data=cred_order)
 kruskal.test(dist_shifted ~ factor(strong_3), data=cred_order) 
+
+kruskal.test(dist ~ depth_saba, data=cred_order) #sig
+kruskal.test(dist ~ factor(strong), data=cred_order) #.07
+kruskal.test(dist ~ factor(strong_2), data=cred_order)
+kruskal.test(dist ~ factor(strong_3), data=cred_order) 
+
 
 t.test(dist_shifted ~ factor(strong_3), alternative = "greater", data=cred_order)
 
@@ -3605,19 +3811,24 @@ t.test(dist_shifted ~ factor(depth_saba_simp), alternative = "less" , data=cred_
 
 #then use this test to see which groups are different
 pairwise.wilcox.test(cred_order$dist_shifted, cred_order$strong_3)
+pairwise.wilcox.test(cred_order$dist_shifted, cred_order$strong_2)
 pairwise.wilcox.test(cred_order$dist_shifted, cred_order$depth_saba_simp)
 pairwise.wilcox.test(cred_order$convex_diff, cred_order$depth_saba_simp)
 pairwise.wilcox.test(abs(cred_order$bottemp), cred_order$depth_saba_simp)
 pairwise.wilcox.test(abs(cred_sub2$sub), cred_sub2$depth_saba_simp)
 
-
+pairwise.wilcox.test(cred_order$dist, cred_order$strong_3)
+pairwise.wilcox.test(cred_order$dist, cred_order$strong_2)
+pairwise.wilcox.test(cred_order$dist, cred_order$depth_saba_simp)
 
 #if unequal variances can run welch anova 
-oneway.test(dist_shifted ~ depth_saba_simp, data=cred_order)
-oneway.test(dist_shifted ~ strong_3, data=cred_order)
+oneway.test(dist ~ depth_profile_simp, data=cred_order)
+oneway.test(dist ~ strong_3, data=cred_order)
 
-summary(lm(dist_shifted ~ depth_saba_simp, data=cred_order))
+summary(gam(dist_shifted ~ depth_saba_simp, data=cred_order))
 summary.aov(lm(dist_shifted ~ depth_saba_simp, data=cred_order))
+
+summary(gam(dist_shifted ~ strong_2, data=cred_order))
 
 summary(lm(convex_diff ~ depth_saba_simp, data=cred_order))
 
@@ -3634,7 +3845,7 @@ summary(lm(abs(bottemp) ~ depth_saba_simp, data=cred_order))
 
 write.csv(cred_order, file="cred_order.csv")
 
-ggplot(data=cred_order, aes(x=depth_saba_simp, y=dist_shifted, fill=depth_saba_simp)) + geom_boxplot() +
+ggplot(data=cred_order, aes(x=depth_profile_simp, y=dist, fill=depth_profile_simp)) + geom_boxplot() +
   stat_summary(fun.y=mean, colour="darkred", geom="point", 
                shape=18, size=3,show_guide = FALSE) +
     labs(y = "distance shifted", x = "species type") + 
@@ -3744,5 +3955,102 @@ ggplot(cred_order_rf, aes(x=SED_TYPE, y=dist_shifted))+
 #this would be awesome if it was significant 
 
 
+```
+
+#results 
+
+```{r}
+#this is all of the data we would need only looking at species that are present in at least 6 months in both time periods! Got significance!!!
+supp <- read.csv("supplemental_table.csv")
+supp$dist <- as.numeric(as.character(supp$dist))
+supp$Months_1 <- as.numeric(supp$Months_1)
+supp$Months_2 <- as.numeric(supp$Months_2)
+
+supp <- subset(supp, supp$Months_1>5 & supp$Months_2>5)
+
+oneway.test(as.numeric(dist) ~ depth_profile_simp, data=supp)
+oneway.test(as.numeric(dist) ~ strong_3, data=supp)
+
+pairwise.wilcox.test(as.numeric(supp$dist), supp$depth_profile_simp)
+pairwise.wilcox.test(as.numeric(supp$convex_diff), supp$depth_profile_simp)
+pairwise.wilcox.test(abs(supp$Bottom.Temperature), supp$depth_profile_simp)
+pairwise.wilcox.test(as.numeric(supp$dist), supp$strong_3)
+pairwise.wilcox.test(as.numeric(supp$dist), supp$strong_2, p.adjust.method = "BH")
+pairwise.wilcox.test(as.numeric(abs(supp$Bottom.Temperature)), supp$depth_profile_simp)
+
+
+kruskal.test(dist ~ depth_profile_simp, data=supp)
+kruskal.test(dist ~ strong_3, data=supp)
+kruskal.test(dist ~ strong_2, data=supp)
+
+kruskal.test(convex_diff ~ depth_profile_simp, data=supp)
+
+summary(gam(as.numeric(supp$dist) ~ supp$strong_2))
+
+#figures 
+ggplot(data=supp, aes(x=depth_profile_simp, y=abs(Bottom.Temperature), fill=depth_profile_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "bottom temperature (strength)", x = "species type") + 
+  theme_classic()
+  ggsave("depth_bt.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+  
+ggplot(data=supp, aes(x=depth_profile_simp, y=dist, fill=depth_profile_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "distance shifted", x = "species type") + 
+  theme_classic()
+  ggsave("depth_dist.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+  
+ggplot(data=supp, aes(x=depth_profile_simp, y=convex_diff, fill=depth_profile_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show.legend = FALSE) +
+    labs(y = "range difference", x = "species type")+ 
+  theme_classic()
+  ggsave("depth_range.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=supp, aes(x=strong_2, y=dist, fill=strong_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+  ggsave("dist_strong.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+#boxplot 
+ggplot(data=subset(supp, !is.na(strong_2)), aes(x= strong_2,  group=depth_profile_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_grid(~depth_profile_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+    ggtheme_Plot()
+  ggsave("barplot.jpg", plot=last_plot(), width = 12, height=6, units=c("in"), dpi=500)
+
+#just substrate 
+cred_sub1 <- supp %>% 
+  dplyr:::select(names, Silt.Mud, dist, convex_diff, depth_profile_simp, depth_saba_simp)
+cred_sub1$sub <- cred_sub1$Silt.Mud
+
+cred_sub <- supp %>% 
+  dplyr:::select(names, Sand, dist, convex_diff, depth_profile_simp, depth_saba_simp)
+cred_sub$sub <- cred_sub$Sand
+cred_sub$names <- paste(cred_sub$names, "2", sep="")
+
+
+cred_sub2 <- smartbind(cred_sub1, cred_sub)
+
+pairwise.wilcox.test(as.numeric(abs(cred_sub2$sub)), cred_sub2$depth_profile_simp)
+#not significant 
+
+#table 
+supp_table <- read.csv("supplemental_table.csv")
+supp_table$Months_1 <- as.numeric(supp_table$Months_1)
+supp_table$Months_2 <- as.numeric(supp_table$Months_2)
+
+supp_table <- subset(supp_table, supp_table$Months_1>5 & supp_table$Months_2>5)
+
+supp_simp <- supp_table %>% dplyr::select(Scientific.name, Common.Name, convex_diff, depth_profile, strong_2, dist, Months_1, Months_2, rmse, r2, MAE)
+write.csv(supp_simp, file="supplemental_simple.csv")
 ```
 
