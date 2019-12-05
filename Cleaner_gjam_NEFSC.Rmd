@@ -1479,6 +1479,7 @@ tot_by_m$scientific_name <- gsub("\\-", ".", tot_by_m$scientific_name)
 
 write.csv(tot_by_m, file="total_months.csv")
 tot_m_6 <- subset(tot_by_m, tot_by_m$months.x>5 & tot_by_m$months.y>5)
+tot_m_4 <- subset(tot_by_m, tot_by_m$months.x>3 & tot_by_m$months.y>3)
 
 tot_m_5 <- subset(tot_by_m, tot_by_m$months.x>4 & tot_by_m$months.y>4)
 
@@ -1493,12 +1494,12 @@ ycommon_1 <- as.data.frame(ycommon_1)
 ycommon_1$one <-1
 ycommon_all <- left_join(ycommon_all, ycommon_1, by =c("ycommon_2"= "ycommon_1"))
 
-specnames_6 <- as.data.frame(specnames_6)
+specnames_6 <- as.data.frame(specnames)
 specnames_6$sixmo <- 1
-ycommon_all <- left_join(ycommon_all, specnames_6, by =c("ycommon_2"= "specnames_6"))
+ycommon_all <- left_join(ycommon_all, specnames_6, by =c("ycommon_2"= "specnames"))
 
 
-sum_m_spec <- ycommon_all[ycommon_all$ycommon_2 %in% specnames_6,] 
+sum_m_spec <- ycommon_all[ycommon_all$ycommon_2 %in% specnames,] 
 
 ```
 
@@ -1655,11 +1656,11 @@ weighted centroid
 ```{r weighted centroid}
 #first time chunk 
 
-spec_coords_1 <- data.frame(name=rep(0,133), x=rep(0,133), y=rep(0,133))
+spec_coords_1 <- data.frame(name=rep(0,115), x=rep(0,115), y=rep(0,115))
 
-for (i in 1:length(specnames_6)) { #for each species in spec_list
-  wt.try <- wt.centroid(total_sp_1, specnames_6[i])
-  name <- specnames_6[i]
+for (i in 1:length(specnames)) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_1, specnames[i])
+  name <- specnames[i]
   xcord <- wt.try@coords[1]
   ycord <- wt.try@coords[2] 
   spec_coords_1[i,] = c(name, xcord, ycord)
@@ -1667,10 +1668,10 @@ for (i in 1:length(specnames_6)) { #for each species in spec_list
 
 #For the 2nd time chunk
 
-spec_coords_2 <- data.frame(name=rep(0,133), x=rep(0,133), y=rep(0,133))
-for (i in 1:length(specNames)) { #for each species in spec_list
-  wt.try <- wt.centroid(total_sp_2, specNames[i])
-  name <- specNames[i]
+spec_coords_2 <- data.frame(name=rep(0,115), x=rep(0,115), y=rep(0,115))
+for (i in 1:length(specnames)) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_2, specnames[i])
+  name <- specnames[i]
   xcord <- wt.try@coords[1]
   ycord <- wt.try@coords[2] 
   spec_coords_2[i,] = c(name, xcord, ycord)
@@ -1732,11 +1733,11 @@ this calculates the geodesic distance between the two points
 ```{r geodesic distance}
 
 dist_total <- as.data.frame(distGeo(spec_coords_1[2:3], spec_coords_2[2:3]))
-dist_total <- cbind(specNames, dist_total)
+dist_total <- cbind(specnames, dist_total)
 dist_total <- cbind(dist_total, spec_coords_1)
 dist_total <- cbind(dist_total, spec_coords_2)
 
-write.csv(dist_total, "dist_total_full_2.csv")
+write.csv(dist_total, "dist_total_full_115.csv")
 
 #lets save all of the mean centroid coordinates to map later
 write.csv(spec_coords_1, "spec_coords_1_full_2.csv")
@@ -1797,6 +1798,7 @@ spring$season <- "spring"
 
 total_big <- rbind(fall, spring)
 total_big_1 <- as.data.frame(total_big)
+total_big_1 <- subset(total_big_1, total_big_1$est_year >= 1984)
 
 total_big_1 <- total_big_1 %>% 
   dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
@@ -1811,6 +1813,7 @@ total_big_1$ID <- factor(total_big_1$ID)
 total_big_sp <- total_big_1 %>% drop_na()
 coordinates(total_big_sp) <- ~ decdeg_beglon + decdeg_beglat
 
+
 library(adehabitatHR)
 
 
@@ -1821,6 +1824,8 @@ spec_hull_tot_area <- as.data.frame(spec_hull_tot[])
 #now for two time chunks
 total_big <- rbind(fall, spring)
 total_big_1 <- as.data.frame(total_big)
+total_big_1 <- subset(total_big_1, total_big_1$est_year >= 1984)
+
 
 total_big_first <- subset(total_big_1, est_year < 2000)
 total_big_second <- subset(total_big_1, est_year > 1999)
@@ -1844,6 +1849,7 @@ library(adehabitatHR)
 
 spec_hull_first <- mcp(total_big_first_sp[,1], percent=95)
 spec_hull_first_area <- as.data.frame(spec_hull_first[])
+plot(spec_hull_tot)
 
 #second
 total_big_second <- total_big_second %>% 
@@ -1868,6 +1874,14 @@ spec_hull_second_area <- as.data.frame(spec_hull_second[])
 write.csv(spec_hull_tot_area, file="spec_hull_tot_area.csv")
 write.csv(spec_hull_first_area, file="spec_hull_first_area.csv")
 write.csv(spec_hull_second_area, file="spec_hull_second_area.csv")
+
+library(rgdal)
+#write these out to shapefiles
+writeOGR(spec_hull_tot, layer= "homerange", driver="ESRI Shapefile", dsn="spechull")
+writeOGR(spec_hull_first, layer= "homerange_1", driver="ESRI Shapefile", dsn="spechull")
+writeOGR(spec_hull_second, layer= "homerange_2", driver="ESRI Shapefile", dsn="spechull")
+
+
 ```
 manipulating what I already did in excel to get the specnames into the format I want 
 
@@ -3424,8 +3438,8 @@ xdata <- read.csv("xdata.csv")
 tot_rf_results <- data.frame()
 
 for (i in 1:length(specnames)) { #for each species in spec_list
-  fit <- randomForest(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total, ntree=300, na.action = na.omit)
-varimp <- importance(fit)
+  fit <- randomForest(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SBFDEPTH + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total, ntree=300, na.action = na.omit, importance=TRUE)
+varimp <- importance(fit, type=1)
 
         varfit <- as.data.frame(t(varimp))
        varfit$names <- specnames[i]
@@ -3435,6 +3449,7 @@ varimp <- importance(fit)
         tot_rf_results <- rbind(tot_rf_results, varfit)
 } 
 
+tot_rf_results$strong <- colnames(tot_rf_results[1:11])[apply(tot_rf_results[1:11],1,which.max)]
 
 ```
 #gam
@@ -3444,17 +3459,18 @@ library(mgcv)
 total <- read.csv("total.csv")
 ydata <- read.csv("ydata.csv")
 xdata <- read.csv("xdata.csv")
-
+specnames <- as.vector(supp$names)
 
 # create data frame to store results
 tot_gam_results <- data.frame()
 tot_gam_stand <- data.frame()
-tot_gam_dev <- data.frame()
+tot_gam_dev <- data.frame(matrix(ncol=11, nrow=1))
+colnames(tot_gam_dev) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb")
 
 for (i in 1:length(specnames)) { #for each species in spec_list
   fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
 #standardized <- lm.beta(fit)
-        fit_depth <- gam(as.formula(paste(specnames[i],"~ avgdepth")), data=total)
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ 1 +avgdepth")), data=total)
           fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total)
            fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total)
            fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total)
@@ -3475,43 +3491,507 @@ for (i in 1:length(specnames)) { #for each species in spec_list
         dev.sdsst <- summary(fit_sdsst)$dev.expl
         dev.geb <- summary(fit_geb)$dev.expl
         
-        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed, dev.sed, dev.sdsal, dev.sdbt, dev.sdsst, dev.geb)
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed, dev.sdsal, dev.sdbt, dev.sdsst, dev.geb)
         dev_table <- as.data.frame(dev_table)
-        dev_table <- t(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev <- rbind(tot_gam_dev, dev_table)
         # get coefficents of fit
-        summary_model <- summary(fit)
-        p <- summary_model$p.table
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
         
         
-        cfit <- fit$coefficients
-        cfit <- as.data.frame(cfit)
-        cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
-        cfit$AIC <- AIC(fit)
-        cfit$Deviance <- dev_table
-        cfit$p_value <- p[,4]
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
   
        
-        tot_gam_results <- rbind(tot_gam_results, cfit)
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
         #tot_gam_stand <- rbind(tot_gam_stand, sfit)
 } 
+tot_gam_dev <- tot_gam_dev[2:78,]
+
+#gam with all substrates 
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+specnames <- as.vector(supp$names)
+
+# create data frame to store results
+#tot_gam_results <- data.frame()
+#tot_gam_stand <- data.frame()
+tot_gam_dev2 <- data.frame(matrix(ncol=17, nrow=1))
+colnames(tot_gam_dev2) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb", "dev.lpi", "dev.slope", "dev.sbfgrp", "dev.sbfdepth", "dev.sed2", "dev.sbfdesed")
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  #fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + LPI + SLOPE + SBF_GRP + SBFDEPTH + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ avgdepth")), data=total, poisson(link = "log"))
+          fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, poisson(link = "log"))
+           fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total, poisson(link = "log"))
+           fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total, poisson(link = "log"))
+           fit_NAO <- gam(as.formula(paste(specnames[i],"~ NAO_year")), data=total, poisson(link = "log"))   
+         fit_sed <- gam(as.formula(paste(specnames[i],"~ SED_TYPE")), data=total, poisson(link = "log"))
+         fit_sdsal <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsal")), data=total, poisson(link = "log"))
+         fit_sdbt <- gam(as.formula(paste(specnames[i],"~ SD3x3shortbt")), data=total, poisson(link = "log")) 
+          fit_sdsst <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsst")), data=total, poisson(link = "log"))
+        fit_geb <- gam(as.formula(paste(specnames[i],"~ gebco_SD_2")), data=total, poisson(link = "log"))
+        fit_lpi <- gam(as.formula(paste(specnames[i],"~ LPI")), data=total, poisson(link = "log"))
+        fit_slope <- gam(as.formula(paste(specnames[i],"~ SLOPE")), data=total, poisson(link = "log"))
+        fit_sbfgrp <- gam(as.formula(paste(specnames[i],"~ SBF_GRP")), data=total, poisson(link = "log"))
+        fit_sbfdepth <- gam(as.formula(paste(specnames[i],"~ SBFDEPTH")), data=total, poisson(link = "log"))
+        fit_sed2 <- gam(as.formula(paste(specnames[i],"~ SEDIMENT")), data=total, poisson(link = "log"))
+        fit_sbfdesed <- gam(as.formula(paste(specnames[i],"~ SBFDESED")), data=total, poisson(link = "log"))
+
+        dev.depth <- summary(fit_depth)$dev.expl
+        dev.bt <- summary(fit_bt)$dev.expl
+        dev.sal <- summary(fit_sal)$dev.expl
+        dev.AMO <- summary(fit_AMO)$dev.expl
+        dev.NAO <- summary(fit_NAO)$dev.expl
+        dev.sed <- summary(fit_sed)$dev.expl
+        dev.sdsal <- summary(fit_sdsal)$dev.expl
+        dev.sdbt <- summary(fit_sdbt)$dev.expl
+        dev.sdsst <- summary(fit_sdsst)$dev.expl
+        dev.geb <- summary(fit_geb)$dev.expl
+        dev.lpi <- summary(fit_lpi)$dev.expl
+        dev.slope <- summary(fit_slope)$dev.expl
+        dev.sbfgrp <- summary(fit_sbfgrp)$dev.expl
+        dev.sbfdepth <- summary(fit_sbfdepth)$dev.expl
+        dev.sed2 <- summary(fit_sed2)$dev.expl
+        dev.sbfdesed <- summary(fit_sbfdesed)$dev.expl
+
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed, dev.sdsal, dev.sdbt, dev.sdsst, dev.geb, dev.lpi, dev.slope, dev.sbfgrp, dev.sbfdepth, dev.sed2, dev.sbfdesed)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb", "dev.lpi", "dev.slope", "dev.sbfgrp", "dev.sbfdepth", "dev.sed2", "dev.sbfdesed")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev2 <- rbind(tot_gam_dev2, dev_table)
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+tot_gam_dev2 <- tot_gam_dev2[2:78,]
+tot_gam_dev2$strong <- colnames(tot_gam_dev2[2:17])[apply(tot_gam_dev2[2:17],1,which.max)]
+
+tot_gam_sub <- tot_gam_dev2
+
+#alright after running this its clear that the substrate variable with the most deviance explained across species is sbfdesed. Try running GAM with that as the only substrate variable 
+
+#gam with just sbfdesed 
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+specnames <- as.vector(supp$names)
+
+# create data frame to store results
+#tot_gam_results <- data.frame()
+#tot_gam_stand <- data.frame()
+tot_gam_dev2 <- data.frame(matrix(ncol=11, nrow=1))
+colnames(tot_gam_dev2) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.sbfdesed", "dev.sed")
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  #fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + LPI + SLOPE + SBF_GRP + SBFDEPTH + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ avgdepth")), data=total, family=nb(link="log"))
+          fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, family=nb(link="log"))
+           fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total, family=nb(link="log"))
+           fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total, family=nb(link="log"))
+           fit_NAO <- gam(as.formula(paste(specnames[i],"~ NAO_year")), data=total, family=nb(link="log"))   
+         fit_sdsal <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsal")), data=total, family=nb(link="log"))
+         fit_sdbt <- gam(as.formula(paste(specnames[i],"~ SD3x3shortbt")), data=total, family=nb(link="log")) 
+          fit_sdsst <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsst")), data=total, family=nb(link="log"))
+          fit_sbfdesed <- gam(as.formula(paste(specnames[i],"~ SBFDESED")), data=total, family=nb(link="log"))
+          fit_sed <- gam(as.formula(paste(specnames[i],"~ SEDIMENT")), data=total, family=nb(link="log"))
+
+        
+        dev.depth <- summary(fit_depth)$dev.expl
+        dev.bt <- summary(fit_bt)$dev.expl
+        dev.sal <- summary(fit_sal)$dev.expl
+        dev.AMO <- summary(fit_AMO)$dev.expl
+        dev.NAO <- summary(fit_NAO)$dev.expl
+        dev.sdsal <- summary(fit_sdsal)$dev.expl
+        dev.sdbt <- summary(fit_sdbt)$dev.expl
+        dev.sdsst <- summary(fit_sdsst)$dev.expl
+        dev.sed <- summary(fit_sed)$dev.expl
+        dev.sbfdesed <- summary(fit_sbfdesed)$dev.expl
+
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sdsal, dev.sdbt, dev.sdsst, dev.sbfdesed, dev.sed)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.sbfdesed", "dev.sed")
+        
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev2 <- rbind(tot_gam_dev2, dev_table)
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+tot_gam_dev2 <- tot_gam_dev2[2:78,]
+tot_gam_dev2$strong <- colnames(tot_gam_dev2[2:11])[apply(tot_gam_dev2[2:11],1,which.max)]
+
+#removing sbfsed 
+tot_gam_dev3 <- tot_gam_dev2 %>% dplyr::select(-dev.sbfdesed, -dev.depth)
+tot_gam_dev3$strong <- colnames(tot_gam_dev3[2:9])[apply(tot_gam_dev3[2:9],1,which.max)]
+
+
+##citation for negative binomial model https://www.nrcresearchpress.com/doi/full/10.1139/cjfas-2013-0342#.XcxMXJNKg6U
+
+# fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, family=ziP())
+# summary(fit_bt)
+# fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, family=poisson(link="log"))
+# summary(fit_bt)
+fit_bt <- gam(Paralichthys.dentatus..summer.flounder.~ bottemp + SBFDESED + avgdepth + botsalin + AMO_unsm_year + NAO_year + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2, data=total, family=nb(link="log"), method="REML")
+
+summary(fit_bt)
+# 
+# fit_bt <- gam(as.formula(paste(specnames[i],"~ SBFDESED")), data=total, family=ziP())
+# summary(fit_bt)
+# fit_bt <- gam(as.formula(paste(specnames[i],"~ SBFDESED")), data=total, family=poisson(link="log"))
+# summary(fit_bt)
+# fit_bt <- gam(as.formula(paste(specnames[i],"~ SBFDESED")), data=total, family=nb(link="log"))
+# summary(fit_bt)
+
+
+# same as above but rsquared 
+tot_gam_dev2 <- data.frame(matrix(ncol=11, nrow=1))
+colnames(tot_gam_dev2) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.sbfdesed", "dev.sed")
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + LPI + SLOPE + SBF_GRP + SBFDEPTH + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ avgdepth")), data=total, family=nb(link="log"))
+          fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, family=nb(link="log"))
+           fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total, family=nb(link="log"))
+           fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total, family=nb(link="log"))
+           fit_NAO <- gam(as.formula(paste(specnames[i],"~ NAO_year")), data=total, family=nb(link="log"))   
+         fit_sdsal <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsal")), data=total, family=nb(link="log"))
+         fit_sdbt <- gam(as.formula(paste(specnames[i],"~ SD3x3shortbt")), data=total, family=nb(link="log")) 
+          fit_sdsst <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsst")), data=total, family=nb(link="log"))
+          fit_sbfdesed <- gam(as.formula(paste(specnames[i],"~ SBFDESED")), data=total, family=nb(link="log"))
+          fit_sed <- gam(as.formula(paste(specnames[i],"~ SEDIMENT")), data=total, family=nb(link="log"))
+
+        
+        dev.depth <- summary(fit_depth)$r.sq
+        dev.bt <- summary(fit_bt)$r.sq
+        dev.sal <- summary(fit_sal)$r.sq
+        dev.AMO <- summary(fit_AMO)$r.sq
+        dev.NAO <- summary(fit_NAO)$r.sq
+        dev.sdsal <- summary(fit_sdsal)$r.sq
+        dev.sdbt <- summary(fit_sdbt)$r.sq
+        dev.sdsst <- summary(fit_sdsst)$r.sq
+        dev.sbfdesed <- summary(fit_sbfdesed)$r.sq
+        dev.sed <- summary(fit_sed)$r.sq
+
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sdsal, dev.sdbt, dev.sdsst, dev.sbfdesed, dev.sed)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.sbfdesed", "dev.sed")
+        
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev2 <- rbind(tot_gam_dev2, dev_table)
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+tot_gam_dev2 <- tot_gam_dev2[2:78,]
+tot_gam_dev2$strong <- colnames(tot_gam_dev2[2:10])[apply(tot_gam_dev2[2:10],1,which.max)]
+
+tot_gam_r2 <- tot_gam_dev2
+
+
+#stepwise ANOVA 
+
+tot_gam_drop_pois <- data.frame(matrix(ncol=11, nrow=1))
+colnames(tot_gam_drop_pois) <- colnames(drop_1)
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SBFDESED + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst")), data=total, family=ziP(theta = NULL, link = "identity",b=0))
+
+drop <- anova(fit)
+drop <- drop$pTerms.table
+drop_1 <- as.data.frame(t(drop[,2]))
+       
+        drop_1$names <- specnames[i]
+        
+        tot_gam_drop_pois <- rbind(tot_gam_drop_pois, drop_1)
+                              }
+
+tot_gam_drop_pois <- tot_gam_drop_pois[2:78,]
+tot_gam_drop_pois$strong <- colnames(tot_gam_drop_pois[1:10])[apply(tot_gam_drop_pois[1:10],1,which.max)]
+
+
+
+```
+
+#negbino glm 
+
+```{r}
+# create data frame to store results
+tot_gam_results <- data.frame()
+tot_gam_log <- data.frame()
+tot_gam_dev <- data.frame(matrix(ncol=7, nrow=1))
+colnames(tot_gam_dev) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed")
+tot_gam_log <- data.frame(matrix(ncol=7, nrow=1))
+colnames(tot_gam_log) <- c("names", "log.depth", "log.bt", "log.sal", "log.AMO", "log.NAO", "log.sed")
+
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  #fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+  tryCatch({
+        fit_depth <- glm.nb(as.formula(paste(specnames[i],"~ 1+ avgdepth")), data=total)
+            fit_bt <- glm.nb(as.formula(paste(specnames[i],"~ 1 + bottemp")), data=total)
+           fit_sal <- glm.nb(as.formula(paste(specnames[i],"~ 1 +  botsalin")), data=total)
+           fit_AMO <- glm.nb(as.formula(paste(specnames[i],"~ 1 + AMO_unsm_year")), data=total)
+           fit_NAO <- glm.nb(as.formula(paste(specnames[i],"~1 + NAO_year")), data=total)   
+         fit_sed <- glm.nb(as.formula(paste(specnames[i],"~ 1 + SEDIMENT")), data=total)
+         #fit_sdsal <- glm.nb(as.formula(paste(specnames[i],"~ 1 + SD3x3shortsal")), data=total)
+         #fit_sdbt <- glm.nb(as.formula(paste(specnames[i],"~ 1 + SD3x3shortbt")), data=total) 
+          #fit_sdsst <- glm.nb(as.formula(paste(specnames[i],"~ 1 + SD3x3shortsst")), maxit = 1000, data=total)
+       # fit_geb <- glm.nb(as.formula(paste(specnames[i],"~ 1 + gebco_SD_2")), data=total)
+        dev.depth<- 1-(fit_depth$deviance/fit_depth$null.deviance)
+        dev.bt<- 1-(fit_bt$deviance/fit_bt$null.deviance)
+        dev.sal <- 1-(fit_sal$deviance/fit_sal$null.deviance)
+        dev.AMO <- 1-(fit_AMO$deviance/fit_AMO$null.deviance)
+        dev.NAO <- 1-(fit_NAO$deviance/fit_NAO$null.deviance)
+        dev.sed <- 1-(fit_sed$deviance/fit_sed$null.deviance)
+        #dev.sdsal <- fit_sdsal$deviance
+        #dev.sdbt <- fit_sdbt$deviance
+      #  dev.geb <- fit_geb$deviance
+        
+       log.depth <- logLik(fit_depth)
+        log.bt <- logLik(fit_bt)
+        log.sal <- logLik(fit_sal)
+        log.AMO <- logLik(fit_AMO)
+        log.NAO <- logLik(fit_NAO)
+        log.sed <- logLik(fit_sed)
+        #log.sdsal <- logLik(fit_sdsal)
+        #log.sdbt <- logLik(fit_sdbt)
+       # log.geb <- logLik(fit_geb)
+        
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev <- rbind(tot_gam_dev, dev_table)
+        
+        log_table <- list("null", log.depth, log.bt, log.sal, log.AMO, log.NAO, log.sed)
+        log_table <- as.data.frame(log_table)
+        colnames(log_table) <- c("names", "log.depth", "log.bt", "log.sal", "log.AMO", "log.NAO", "log.sed")
+        log_table$names <- specnames[i]
+        tot_gam_log <- rbind(tot_gam_log, log_table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+tot_gam_dev <- tot_gam_dev[2:70,]
+```
+#using drop 1 glm
+```{r}
+tot_gam_drop_AIC <- data.frame(matrix(ncol=17, nrow=1))
+colnames(tot_gam_drop_AIC) <- colnames(drop_1)
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + LPI + SLOPE + SBF_GRP + SBFDEPTH + SED_TYPE + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+drop <- drop1(fit, test="F")
+drop_1 <- as.data.frame(t(drop[3]))
+       
+        drop_1$names <- specnames[i]
+        
+        tot_gam_drop_AIC <- rbind(tot_gam_drop_AIC, drop_1)
+                              }
+
+tot_gam_drop_dev <- data.frame(matrix(ncol=17, nrow=1))
+colnames(tot_gam_drop_dev) <- colnames(drop_1)
+
+
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + LPI + SLOPE + SBF_GRP + SBFDEPTH + SED_TYPE + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+drop <- drop1(fit, test="F")
+drop_1 <- as.data.frame(t(drop[2]))
+       
+        drop_1$names <- specnames[i]
+        
+        tot_gam_drop_dev <- rbind(tot_gam_drop_dev, drop_1)
+                              }
+
+
+tot_gam_drop_AIC <- tot_gam_drop_AIC[2:78,]
+tot_gam_drop_dev <- tot_gam_drop_dev[2:78,]
+tot_gam_drop_AIC$strong <- colnames(tot_gam_drop_AIC[2:16])[apply(tot_gam_drop_AIC[2:16],1,which.max)]
+
+tot_gam_drop_dev$strong <- colnames(tot_gam_drop_dev[2:16])[apply(tot_gam_drop_dev[2:16],1,which.max)]
+
+
+#simplified drop 
+tot_gam_drop_AIC_simp <- data.frame(matrix(ncol=11, nrow=1))
+colnames(tot_gam_drop_AIC_simp) <- colnames(drop_1)
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst")), data=total)
+drop <- drop1(fit, test="F")
+drop_1 <- as.data.frame(t(drop[3]))
+       
+        drop_1$names <- specnames[i]
+        
+        tot_gam_drop_AIC_simp <- rbind(tot_gam_drop_AIC_simp, drop_1)
+                              }
+
+tot_gam_drop_dev_simp <- data.frame(matrix(ncol=11, nrow=1))
+colnames(tot_gam_drop_dev_simp) <- colnames(drop_1)
+
+
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst")), data=total)
+drop <- drop1(fit, test="F")
+drop_1 <- as.data.frame(t(drop[2]))
+       
+        drop_1$names <- specnames[i]
+        
+        tot_gam_drop_dev_simp <- rbind(tot_gam_drop_dev_simp, drop_1)
+                              }
+
+
+tot_gam_drop_AIC_simp <- tot_gam_drop_AIC_simp[2:78,]
+tot_gam_drop_dev_simp <- tot_gam_drop_dev_simp[2:78,]
+tot_gam_drop_AIC_simp$strong <- colnames(tot_gam_drop_AIC_simp[2:10])[apply(tot_gam_drop_AIC_simp[2:10],1,which.max)]
+
+tot_gam_drop_dev_simp$strong <- colnames(tot_gam_drop_dev_simp[2:10])[apply(tot_gam_drop_dev_simp[2:10],1,which.max)]
+
+#lets compare 
+glm_drop_compare <- left_join(tot_gam_drop_dev_simp, tot_gam_drop_AIC_simp, by="names")
+glm_drop_compare <- glm_drop_compare %>% dplyr::select(names, strong.x, strong.y)
+
+
+
+#negativebinomial drop 
+library(pscl)
+
+glm_drop_AIC <- data.frame(matrix(ncol=17, nrow=1))
+colnames(glm_drop_AIC) <- colnames(drop_1)
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- zeroinfl(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + LPI + SLOPE + SBF_GRP + SBFDEPTH + SED_TYPE + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total, dist="negbin", maxit = 100)
+drop <- drop1(fit, test="F")
+drop_1 <- as.data.frame(t(drop[3]))
+       
+        drop_1$names <- specnames[i]
+        
+        glm_drop_AIC <- rbind(glm_drop_AIC, drop_1)
+                              }
+
+glm_drop_dev <- data.frame(matrix(ncol=11, nrow=1))
+glm_drop_AIC <- data.frame(matrix(ncol=11, nrow=1))
+
+colnames(glm_drop_dev) <- colnames(drop_1)
+colnames(glm_drop_AIC) <- colnames(drop_1)
+
+library(arm)
+library(hurdlr)
+set.seed(123)
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- glm.nb(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SD3x3shortsal + SD3x3shortbt")), data=total, na.action = na.omit, maxit=1000)
+  #fit <- glm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + gebco_SD_2 + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst")), data=total, na.action = na.omit, family=quasipoisson(link="log"))
+  #coefini=coef(glm(Lumpenus.lampretaeformis..snakeblenny.~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst, , data=total, na.action = na.omit, family=quasipoisson(link="log")))
+fit <- bayesglm(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst")), data=total, na.action = na.omit, family=nb(link="log"))
+# logLik_1 <- logLik(fit)
+# getS3method('logLik', 'negbin')
+# getS3method(fit)
+# drop <- lrtest(fit)
+drop <- drop1(fit)
+drop_1 <- as.data.frame(t(drop[2]))
+       
+        drop_1$names <- specnames[i]
+        
+        glm_drop_dev <- rbind(glm_drop_dev, drop_1)
+        drop_2 <- as.data.frame(t(drop[3]))
+        glm_drop_AIC <- rbind(glm_drop_AIC, drop_2)
+                                )
+                              }
+
+
+glm_drop_AIC <- glm_drop_AIC[2:78,]
+glm_drop_dev <- glm_drop_dev[2:78,]
+glm_drop_AIC$strong <- colnames(glm_drop_AIC[2:16])[apply(glm_drop_AIC[2:16],1,which.max)]
+
+glm_drop_dev$strong <- colnames(glm_drop_dev[1:10])[apply(glm_drop_dev[1:10],1,which.max)]
+
+
+
 
 ```
 
 #deviance explained - kinda useless
 ```{r}
-cred_dev_gam <- tot_gam_results %>% 
-separate(col=names, sep="([+])", into=c("names", "var"))
-cred_dev_gam <- cred_dev_gam[!(cred_dev_gam$p_value > .05),]
-  #this gets out all of the significant values 
+# cred_dev_gam <- tot_gam_results %>% 
+# separate(col=names, sep="([+])", into=c("names", "var"))
+# cred_dev_gam <- cred_dev_gam[!(cred_dev_gam$p_value > .05),]
+#   #this gets out all of the significant values 
+# 
+# cred_dev_gam_2 <- cred_dev_gam%>% 
+#   dplyr:::select(-AIC, -p_value, -cfit) %>% 
+#   spread(var, value=Deviance)
+# 
+# ix <- 2:13 
+# cred_dev_gam_2[ix] <- lapply(cred_dev_gam_2[ix], as.numeric) 
 
-cred_dev_gam_2 <- cred_dev_gam%>% 
-  dplyr:::select(-AIC, -p_value, -cfit) %>% 
-  spread(var, value=Deviance)
-
-ix <- 2:13 
-cred_dev_gam_2[ix] <- lapply(cred_dev_gam_2[ix], as.numeric) 
-
-cred_dev_gam_2$strong <- colnames(cred_dev_gam_2)[apply(cred_dev_gam_2,1,which.max)]
+tot_gam_dev$strong <- colnames(tot_gam_dev[2:11])[apply(tot_gam_dev[2:11],1,which.max)]
 #MAX<-apply(cred_dev_gam_2[2:13], 1, max, na.rm=TRUE)
 
 #compare this to cred_order 
@@ -3960,7 +4440,7 @@ ggplot(cred_order_rf, aes(x=SED_TYPE, y=dist_shifted))+
 #results 
 
 ```{r}
-#this is all of the data we would need only looking at species that are present in at least 6 months in both time periods! Got significance!!!
+#this is all of the data we would need only looking at species that are present in at least 6 months in both time periods! Got significance!!! Currently emailing Jim to make sure that I can compare factors with covariates 
 supp <- read.csv("supplemental_table.csv")
 supp$dist <- as.numeric(as.character(supp$dist))
 supp$Months_1 <- as.numeric(supp$Months_1)
@@ -4054,3 +4534,890 @@ supp_simp <- supp_table %>% dplyr::select(Scientific.name, Common.Name, convex_d
 write.csv(supp_simp, file="supplemental_simple.csv")
 ```
 
+#dev results...
+##significant difference between deviance explained for bt and substrate between pelagic and demersal. 
+```{r}
+supp_1 <- read.csv("supplemental_table.csv")
+tot_gam_dev3$strong <- colnames(tot_gam_dev2[2:9])[apply(tot_gam_dev2[2:9],1,which.max)]
+
+tot_gam_dev2 <- tot_gam_dev2 %>% dplyr::select(-dev.sbfdesed)
+tot_gam_dev2$strong <- colnames(tot_gam_dev2[2:10])[apply(tot_gam_dev2[2:10],1,which.max)]
+
+tot_gam_dev$strong <- colnames(tot_gam_dev[2:7])[apply(tot_gam_dev[2:7],1,which.max)]
+
+tot_gam_log <- tot_gam_log[2:70,]
+
+tot_gam_log$strong <- colnames(tot_gam_log[2:7])[apply(tot_gam_log[2:7],1,which.max)]
+
+##this is significant and works!
+dist <- supp_3 %>% dplyr::select(names, dist, depth_saba_simp, depth_profile_simp)
+supp_2 <- left_join(tot_gam_dev3, dist,  by="names")
+
+supp_2$strong.y.2 <- ifelse(supp_2$strong == "dev.sed", "substrate", ifelse(supp_2$strong == "dev.bt", "bottemp", ifelse(supp_2$strong == "dev.depth", "depth", ifelse(supp_2$strong == "dev.sdbt" | supp_2$strong == "dev.sdsal", "sal variability", ifelse(supp_2$strong == "dev.AMO", "climate", ifelse(supp_2$strong == "dev.sal", "salinity", NA))))))
+
+supp_2$strong.y.3 <- ifelse(supp_2$strong.y.2 =="substrate", "bottom habitat", ifelse(supp_2$strong.y.2 == "bottemp" | supp_2$strong.y.2 == "salinity" | supp_2$strong.y.2 == "variability", "oceanography", supp_2$strong.y.2))
+
+supp_2$strong.y.4 <- ifelse(supp_2$strong.y =="dev.sed", "sediment", ifelse(supp_2$strong.y == "dev.bt", "bottom temperature", NA))
+
+#paralepidad is actually pelagic and lobster is demersal 
+supp_2[2,20]<- "pelagic"
+supp_2[14,20]<- "demersal"
+supp_2[64,20]<- "demersal"
+
+pairwise.wilcox.test(as.numeric(supp_2$dist), supp_2$depth_profile_simp)
+pairwise.wilcox.test(as.numeric(supp_2$convex_diff), supp_2$depth_profile_simp)
+pairwise.wilcox.test(supp_2$dev.bt, supp_2$depth_profile_simp)
+pairwise.wilcox.test(supp_2$dev.sed, supp_2$depth_profile_simp)
+
+pairwise.wilcox.test(as.numeric(supp_2$dist), supp_2$strong.y.2)
+pairwise.wilcox.test(as.numeric(supp_2$dist), supp_2$strong.y.3)
+pairwise.wilcox.test(as.numeric(supp_2$dist), supp_2$strong.y.4)
+
+pairwise.wilcox.test(as.numeric(supp_2$convex_diff), supp_2$strong.y.3)
+pairwise.wilcox.test(as.numeric(supp_2$convex_diff), supp_2$strong.y.2)
+
+#neither of these is significant which stinks 
+
+
+
+#deviance explained versus distance shifted (all of these are negative for dist, but variation for convex diff). Nothing interesting is significant if all negative 
+summary(lm(supp_2$dist ~ supp_2$dev.bt))
+plot(supp_2$dev.bt, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.bt))
+
+summary(lm(supp_2$convex_diff ~ supp_2$dev.sed))
+plot(supp_2$dev.sed, supp_2$convex_diff)
+abline(lm(supp_2$convex_diff ~ supp_2$dev.sed))
+
+summary(lm(supp_2$convex_diff ~ supp_2$dev.bt))
+plot(supp_2$dev.bt, supp_2$convex_diff)
+abline(lm(supp_2$convex_diff ~ supp_2$dev.bt))
+
+summary(lm(supp_2$dist ~ supp_2$dev.sal))
+plot(supp_2$dev.sal, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.sal))
+
+summary(lm(supp_2$dist ~ supp_2$dev.depth))
+plot(supp_2$dev.depth, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.depth))
+
+summary(lm(supp_2$dist ~ supp_2$dev.AMO))
+plot(supp_2$dev.AMO, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.AMO))
+
+summary(lm(supp_2$dist ~ supp_2$dev.NAO))
+plot(supp_2$dev.NAO, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.NAO))
+
+summary(lm(supp_2$dist ~ supp_2$dev.sdsal))
+plot(supp_2$dev.sdsal, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.sdsal))
+
+summary(lm(supp_2$dist ~ supp_2$dev.sdsst))
+plot(supp_2$dev.sdsst, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.sdsst))
+
+summary(lm(supp_2$dist ~ supp_2$dev.sdbt))
+plot(supp_2$dev.sdbt, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.sdbt))
+
+summary(lm(supp_2$dist ~ supp_2$dev.sed)) #*
+plot(supp_2$dev.sed, supp_2$dist)
+abline(lm(supp_2$dist ~ supp_2$dev.sed))
+
+
+pairwise.wilcox.test(as.numeric(supp_2$dist), supp_2$strong.y.3, p.adjust.method = "BH")
+pairwise.wilcox.test(as.numeric(supp_2$convex_diff), supp_2$strong.y.2, p.adjust.method = "BH")
+# pairwise.wilcox.test(as.numeric(supp_2$dev.geb), supp$depth_profile_simp)
+# pairwise.wilcox.test(as.numeric(supp_2$dev.sed), supp$depth_profile_simp)
+# pairwise.wilcox.test(as.numeric(supp_2$dev.bt), supp$depth_profile_simp)
+# pairwise.wilcox.test(as.numeric(supp_2$dev.sal), supp$depth_profile_simp) #*
+# pairwise.wilcox.test(as.numeric(supp_2$dev.depth), supp$depth_profile_simp) #*
+# pairwise.wilcox.test(as.numeric(supp_2$dev.AMO), supp$depth_profile_simp) #* 
+# pairwise.wilcox.test(as.numeric(supp_2$dev.NAO), supp$depth_profile_simp)
+
+#actually the deviance explained by all variables is always more for demersal probably because there are more of those species. 
+
+ggplot(data=supp_2, aes(x= strong.y.2,  group=depth_saba_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_grid(~depth_saba_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+    ggtheme_Plot() + 
+  ggsave("barplot_gam.jpg", plot=last_plot(), width = 12, height=6, units=c("in"), dpi=500)
+
+ggplot(data=supp_2, aes(x=strong.y.2, y=dist, fill=strong.y.2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=supp_2, aes(x=depth_profile_simp, y=dist, fill=depth_profile_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=supp_2, aes(x=depth_profile_simp, y=dev.sed, fill=depth_profile_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "substrate dev explained", x = "species")+ 
+  theme_classic()
+
+ggplot(data=supp_2, aes(x=depth_profile_simp, y=dev.bt, fill=depth_profile_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "bt dev explained", x = "species")+ 
+  theme_classic()
+
+summary(aov(supp_2$dev.sbfdesed ~ supp_2$depth_saba_simp))
+summary(aov(supp_2$dev.bt~ supp_2$depth_saba_simp))
+
+
+#lets try taking out depth as 
+tot_gam_dev2 <- tot_gam_dev2 %>% dplyr::select(-dev.depth)
+
+tot_gam_dev2$strong <- colnames(tot_gam_dev2[2:9])[apply(tot_gam_dev2[2:9],1,which.max)]
+
+
+```
+#gam_drop_results 
+
+```{r}
+
+dist_info <- supp %>% dplyr::select(dist, convex_diff, names, depth_profile_simp, depth_saba_simp)
+
+gam_supp <- left_join(tot_gam_drop_f, dist_info, by="names")
+
+
+#paralepidad is actually pelagic and lobster is demersal 
+gam_supp[2,15]<- "pelagic"
+gam_supp[14,15]<- "demersal"
+gam_supp[64,15]<- "demersal"
+
+#make new columns for combining strongest variables 
+
+gam_supp$strong.dev.2 <- ifelse(gam_supp$strong == "SEDIMENT" | gam_supp$strong == "SBFDESED", "substrate", ifelse(gam_supp$strong == "bottemp", "bottemp", ifelse(gam_supp$strong == "avgdepth", "depth", ifelse(gam_supp$strong == "SD3x3shortbt" | gam_supp$strong == "SD3x3shortsal"| gam_supp$strong == "SD3x3shortsst", "variability", ifelse(gam_supp$strong == "botsalin", "salinity", ifelse(gam_supp$strong == "AMO_unsm_year", "climate", NA))))))
+
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$depth_profile_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$strong.dev.2)
+
+
+ggplot(data=gam_supp, aes(x= strong.dev.2,  group=depth_profile_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_grid(~depth_profile_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+    ggtheme_Plot()  
+  #ggsave("barplot_gam.jpg", plot=last_plot(), width = 12, height=6, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(dist), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+```
+
+
+#glm results **sig   
+
+```{r}
+supp_1 <- read.csv("supplemental_table.csv")
+
+dist_info <- supp %>% dplyr::select(dist, convex_diff, names, depth_profile_simp, depth_saba_simp)
+
+glm_supp <- left_join(glm_drop_dev, dist_info, by="names")
+
+
+#paralepidad is actually pelagic and lobster is demersal 
+glm_supp[2,15]<- "demersal"
+glm_supp[14,15]<- "demersal"
+glm_supp[64,15]<- "demersal"
+
+#make new columns for combining strongest variables 
+
+glm_supp$strong.dev <- ifelse(glm_supp$strong == "SEDIMENT", "substrate", ifelse(glm_supp$strong == "bottemp", "bottemp", ifelse(glm_supp$strong == "avgdepth", "depth", ifelse(glm_supp$strong == "SD3x3shortbt" | glm_supp$strong == "SD3x3shortsal"| glm_supp$strong == "SD3x3shortsst", "variability", ifelse(glm_supp$strong == "botsalin", "salinity", NA)))))
+
+glm_supp$strong.dev.2 <- ifelse(glm_supp$strong.x == "SEDIMENT", "substrate", ifelse(glm_supp$strong.x == "bottemp", "bottemp", ifelse(glm_supp$strong.x == "avgdepth", "depth", ifelse(glm_supp$strong.x == "SD3x3shortbt" | glm_supp$strong.x == "SD3x3shortsal"| glm_supp$strong.x == "SD3x3shortsst", "variability", ifelse(glm_supp$strong.x == "botsalin", "salinity", NA)))))
+
+
+pairwise.wilcox.test(as.numeric(glm_supp$dist), glm_supp$depth_profile_simp)
+pairwise.wilcox.test(as.numeric(glm_supp$dist), glm_supp$strong.AIC.2)
+pairwise.wilcox.test(as.numeric(glm_supp$dist), glm_supp$strong.dev)
+
+
+ggplot(data=glm_supp, aes(x= strong.dev,  group=depth_saba_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_grid(~depth_saba_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+    ggtheme_Plot()  
+  #ggsave("barplot_gam.jpg", plot=last_plot(), width = 12, height=6, units=c("in"), dpi=500)
+
+ggplot(data=glm_supp, aes(x=strong.dev, y=as.numeric(dist), fill=strong.dev)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=glm_supp, aes(x=strong.dev.2, y=as.numeric(dist), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+```
+
+#rf results...
+##no real signficance and can't compare variable importance accross species (except for which is most important which doesnt really show much )
+```{r}
+
+dist_info <- supp_1 %>% dplyr::select(dist, convex_diff, names, depth_profile_simp, depth_saba_simp)
+
+rf_supp <- left_join(tot_rf_results, dist_info, by="names")
+
+
+#paralepidad is actually pelagic and lobster is demersal 
+rf_supp[2,16]<- "pelagic"
+rf_supp[14,16]<- "demersal"
+rf_supp[64,16]<- "demersal"
+
+#make new columns for combining strongest variables 
+
+rf_supp$strong.2 <- ifelse(rf_supp$strong == "SEDIMENT"| rf_supp$strong =="gebco_SD_2" | rf_supp$strong =="SBFDEPTH", "substrate", ifelse(rf_supp$strong == "bottemp", "bottemp", ifelse(rf_supp$strong == "avgdepth", "depth", ifelse(rf_supp$strong == "SD3x3shortbt" | rf_supp$strong == "SD3x3shortsal"| rf_supp$strong == "SD3x3shortsst", "variability", ifelse(rf_supp$strong == "botsalin", "salinity", NA)))))
+
+rf_supp$strong.dev.2 <- ifelse(rf_supp$strong.x == "SEDIMENT", "substrate", ifelse(rf_supp$strong.x == "bottemp", "bottemp", ifelse(rf_supp$strong.x == "avgdepth", "depth", ifelse(rf_supp$strong.x == "SD3x3shortbt" | rf_supp$strong.x == "SD3x3shortsal"| rf_supp$strong.x == "SD3x3shortsst", "variability", ifelse(rf_supp$strong.x == "botsalin", "salinity", NA)))))
+
+
+pairwise.wilcox.test(as.numeric(rf_supp$dist), rf_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(rf_supp$dist), rf_supp$strong.2)
+pairwise.wilcox.test(as.numeric(rf_supp$dist), rf_supp$strong.dev.2)
+
+
+ggplot(data=rf_supp, aes(x= strong.2,  group=depth_profile_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_grid(~depth_profile_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+    ggtheme_Plot()  
+  #ggsave("barplot_gam.jpg", plot=last_plot(), width = 12, height=6, units=c("in"), dpi=500)
+
+ggplot(data=rf_supp, aes(x=strong.AIC.2, y=as.numeric(dist), fill=strong.AIC.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=rf_supp, aes(x=strong.dev.2, y=as.numeric(dist), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+```
+
+#results with more species - this is good!!!
+```{r}
+total_by_m <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/total_months.csv")
+#in at least 100 tows and present in 3 or more months 
+
+tot_m_3 <- subset(tot_by_m, tot_by_m$months.x>2 & tot_by_m$months.y>2)
+specnames <- as.vector(tot_m_3$scientific_name)#257 
+
+ycommon_all <- as.data.frame(ycommon_2)
+ycommon_all$two <- 1
+ycommon_1 <- as.data.frame(ycommon_1)
+ycommon_1$one <-1
+ycommon_all <- left_join(ycommon_all, ycommon_1, by =c("ycommon_2"= "ycommon_1"))
+
+specnames <- as.data.frame(specnames)
+ycommon_all <- left_join(ycommon_all, tot_m_3, by =c("ycommon_2"= "scientific_name"))
+
+
+selected <- subset(ycommon_all, ycommon_all$one ==1 & ycommon_all$two ==1 & ycommon_all$months.x >1 )
+
+
+specnames <- as.vector(selected$ycommon_2)#115
+
+#remove unidentified fish 
+specnames <- subset(specnames, specnames!="UNIDENTIFIED.FISH")
+
+
+#running a negative binomial glm 
+
+# create data frame to store results
+tot_glm_log <- data.frame()
+tot_glm_dev <- data.frame(matrix(ncol=7, nrow=1))
+colnames(tot_glm_dev) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed")
+tot_glm_log <- data.frame(matrix(ncol=7, nrow=1))
+colnames(tot_glm_log) <- c("names", "log.depth", "log.bt", "log.sal", "log.AMO", "log.NAO", "log.sed")
+
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  #fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SEDIMENT + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+  tryCatch({
+        fit_depth <- glm.nb(as.formula(paste(specnames[i],"~ 1+ avgdepth")), data=total)
+            fit_bt <- glm.nb(as.formula(paste(specnames[i],"~ 1 + bottemp")), data=total)
+           fit_sal <- glm.nb(as.formula(paste(specnames[i],"~ 1 +  botsalin")), data=total)
+           fit_AMO <- glm.nb(as.formula(paste(specnames[i],"~ 1 + AMO_unsm_year")), data=total)
+           fit_NAO <- glm.nb(as.formula(paste(specnames[i],"~1 + NAO_year")), data=total)   
+         fit_sed <- glm.nb(as.formula(paste(specnames[i],"~ 1 + SEDIMENT")), data=total)
+         #fit_sdsal <- glm.nb(as.formula(paste(specnames[i],"~ 1 + SD3x3shortsal")), data=total)
+         #fit_sdbt <- glm.nb(as.formula(paste(specnames[i],"~ 1 + SD3x3shortbt")), data=total) 
+          #fit_sdsst <- glm.nb(as.formula(paste(specnames[i],"~ 1 + SD3x3shortsst")), maxit = 1000, data=total)
+       # fit_geb <- glm.nb(as.formula(paste(specnames[i],"~ 1 + gebco_SD_2")), data=total)
+        dev.depth<- 1-(fit_depth$deviance/fit_depth$null.deviance)
+        dev.bt<- 1-(fit_bt$deviance/fit_bt$null.deviance)
+        dev.sal <- 1-(fit_sal$deviance/fit_sal$null.deviance)
+        dev.AMO <- 1-(fit_AMO$deviance/fit_AMO$null.deviance)
+        dev.NAO <- 1-(fit_NAO$deviance/fit_NAO$null.deviance)
+        dev.sed <- 1-(fit_sed$deviance/fit_sed$null.deviance)
+        #dev.sdsal <- fit_sdsal$deviance
+        #dev.sdbt <- fit_sdbt$deviance
+      #  dev.geb <- fit_geb$deviance
+        
+       log.depth <- logLik(fit_depth)
+        log.bt <- logLik(fit_bt)
+        log.sal <- logLik(fit_sal)
+        log.AMO <- logLik(fit_AMO)
+        log.NAO <- logLik(fit_NAO)
+        log.sed <- logLik(fit_sed)
+        #log.sdsal <- logLik(fit_sdsal)
+        #log.sdbt <- logLik(fit_sdbt)
+       # log.geb <- logLik(fit_geb)
+        
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed")
+        dev_table$names <- specnames[i]
+        
+        tot_glm_dev <- rbind(tot_glm_dev, dev_table)
+        
+        log_table <- list("null", log.depth, log.bt, log.sal, log.AMO, log.NAO, log.sed)
+        log_table <- as.data.frame(log_table)
+        colnames(log_table) <- c("names", "log.depth", "log.bt", "log.sal", "log.AMO", "log.NAO", "log.sed")
+        log_table$names <- specnames[i]
+        tot_glm_log <- rbind(tot_glm_log, log_table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+tot_glm_dev <- tot_glm_dev[2:91,]
+
+tot_glm_dev$strong <- colnames(tot_glm_dev[2:7])[apply(tot_glm_dev[2:7],1,which.max)]
+
+#loading the specnames info 
+specnames_info <- read.csv("specnames_159.csv")
+specnames_info <- specnames_info[,1:7]
+dist_info <- dist_total[,1:2] 
+
+
+specinfo <- left_join(specnames_info, dist_info, by=c("names"="specnames"))
+
+glm_supp <- left_join(tot_glm_dev, specinfo, by=c("names"))
+
+glm_supp$dist <- glm_supp$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`
+
+glm_supp$strong.dev.2 <- ifelse(glm_supp$strong == "dev.sed", "substrate", ifelse(glm_supp$strong == "dev.bt", "bottemp", ifelse(glm_supp$strong == "dev.depth", "depth", ifelse(glm_supp$strong == "dev.AMO" | glm_supp$strong == "dev.NAO", "climate", ifelse(glm_supp$strong == "dev.sal", "salinity", NA)))))
+
+
+pairwise.wilcox.test(as.numeric(glm_supp$dist), glm_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(glm_supp$dist), glm_supp$strong.dev.2)
+pairwise.wilcox.test(as.numeric(glm_supp$dev.bt), glm_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(glm_supp$dev.sed), glm_supp$depth_saba_simp)
+
+
+
+ggplot(data=glm_supp, aes(x= strong.dev.2,  group=depth_saba_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_grid(~depth_saba_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+    ggtheme_Plot()  
+  #ggsave("barplot_gam.jpg", plot=last_plot(), width = 12, height=6, units=c("in"), dpi=500)
+
+library(reshape2)
+library(ggpubr)
+
+dat.m <- melt(glm_supp,id.vars='names', measure.vars=c('dev.bt','dev.sed','dev.depth', 'dev.AMO', 'dev.NAO', 'dev.sal'))
+data.m <- left_join(specinfo, dat.m, by=c("names"))
+data.m <- as.data.frame(data.m)
+ggbarplot(data.m, x="variable", y="value", add="mean", facet.by = "depth_saba_simp")
+#this sort of shows what I want, but mostly that pelagic species are explained by a couple of things wherease demersal are explained mainly by substrate. 
+
+ggplot(data=glm_supp, aes(x=strong.dev.2, y=as.numeric(dist), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+
+
+ggplot(data=glm_supp, aes(x=depth_saba_simp, y=dev.bt, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "bottom temperature (strength)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=glm_supp, aes(x=depth_saba_simp, y=dev.sed, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "bottom temperature (strength)", x = "species type") + 
+  theme_classic()
+
+ggplot(data.m, aes(x=dist, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+
+#I ran the same as above but with variability included and everything had variability as the strongest variabe. 
+
+#running the same process but with GAM 
+# create data frame to store results
+tot_gam_results <- data.frame()
+tot_gam_stand <- data.frame()
+tot_gam_dev_more <- data.frame(matrix(ncol=11, nrow=1))
+colnames(tot_gam_dev_more) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb")
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+    tryCatch({
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ 1 +avgdepth")), data=total, family=nb(link="log"))
+          fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, family=nb(link="log"))
+           fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total, family=nb(link="log"))
+           fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total, family=nb(link="log"))
+           fit_NAO <- gam(as.formula(paste(specnames[i],"~ NAO_year")), data=total, family=nb(link="log"))   
+         fit_sed <- gam(as.formula(paste(specnames[i],"~ SEDIMENT")), data=total, family=nb(link="log"))
+         fit_sdsal <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsal")), data=total, family=nb(link="log"))
+         fit_sdbt <- gam(as.formula(paste(specnames[i],"~ SD3x3shortbt")), data=total, family=nb(link="log")) 
+          fit_sdsst <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsst")), data=total, family=nb(link="log"))
+        fit_geb <- gam(as.formula(paste(specnames[i],"~ gebco_SD_2")), data=total, family=nb(link="log"))
+        dev.depth <- summary(fit_depth)$dev.expl
+        dev.bt <- summary(fit_bt)$dev.expl
+        dev.sal <- summary(fit_sal)$dev.expl
+        dev.AMO <- summary(fit_AMO)$dev.expl
+        dev.NAO <- summary(fit_NAO)$dev.expl
+        dev.sed <- summary(fit_sed)$dev.expl
+        dev.sdsal <- summary(fit_sdsal)$dev.expl
+        dev.sdbt <- summary(fit_sdbt)$dev.expl
+        dev.sdsst <- summary(fit_sdsst)$dev.expl
+        dev.geb <- summary(fit_geb)$dev.expl
+        
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed, dev.sdsal, dev.sdbt, dev.sdsst, dev.geb)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev_more <- rbind(tot_gam_dev_more, dev_table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+
+tot_gam_dev_more <- tot_gam_dev_more[2:116,]
+
+tot_gam_dev_more$strong <- colnames(tot_gam_dev_more[2:10])[apply(tot_gam_dev_more[2:10],1,which.max)]
+tot_gam_dev_more$strong <- colnames(tot_gam_dev_more[2:7])[apply(tot_gam_dev_more[2:7],1,which.max)]
+
+#loading the specnames info 
+specnames_info <- read.csv("specnames_159.csv")
+specnames_info <- specnames_info[,1:7]
+dist_info <- dist_total[,1:2] 
+
+#convex info 
+convex_1 <- read.csv("spechull/homerange_1.csv")
+convex_2 <- read.csv("spechull/homerange_2.csv")
+convex_1 <- convex_1 %>% dplyr::select(names, area, EXT_MIN_Y, EXT_MAX_Y)
+convex_2 <- convex_2 %>% dplyr::select(names, area, EXT_MIN_Y, EXT_MAX_Y)
+colnames(convex_1) <- c("names", "area_1", "min_y_1", "max_y_1")
+colnames(convex_2) <- c("names", "area_2", "min_y_2", "max_y_2")
+
+
+
+convex <- merge(convex_2, convex_1, by="names")
+convex$area_diff <- convex$area_2 - convex$area_1
+convex$min_diff <- convex$min_y_2 - convex$min_y_1
+convex$max_diff <- convex$max_y_2 - convex$max_y_1
+
+
+
+specinfo <- left_join(specnames_info, dist_info, by=c("names"="specnames"))
+specinfo <- left_join(specinfo, convex, by="names")
+specinfo$dist <- specinfo$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`
+gam_supp <- left_join(tot_gam_dev_more, specinfo, by=c("names"))
+
+gam_supp$dist <- gam_supp$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`
+
+gam_supp$strong.dev.2 <- ifelse(gam_supp$strong == "dev.sed", "substrate", ifelse(gam_supp$strong == "dev.bt", "bottemp", ifelse(gam_supp$strong == "dev.depth", "depth", ifelse(gam_supp$strong == "dev.AMO" | gam_supp$strong == "dev.NAO", "climate", ifelse(gam_supp$strong == "dev.sal", "salinity", ifelse(gam_supp$strong == "dev.sdsal" | gam_supp$strong == "dev.sdbt" | gam_supp$strong == "dev.sdsst", "variability", NA))))))
+
+gam_supp$strong.dev.3 <- ifelse(gam_supp$strong.dev.2 == "substrate", "substrate", ifelse(gam_supp$strong.dev.2 == "bottemp", "bottemp", NA))
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$area_diff), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$strong.dev.2)
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$strong.dev.3)
+pairwise.wilcox.test(as.numeric(gam_supp$area_diff), gam_supp$strong.dev.2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.bt), gam_supp$depth_saba_simp) #*
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sed), gam_supp$depth_saba_simp) #*
+pairwise.wilcox.test(as.numeric(gam_supp$dev.depth), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.AMO), gam_supp$depth_saba_simp)# * 
+pairwise.wilcox.test(as.numeric(gam_supp$dev.NAO), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sal), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sdsal), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sdbt), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sdsst), gam_supp$depth_saba_simp)
+
+
+
+library(ggsci)
+cbbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+ggplot(data=gam_supp, aes(x= strong.dev.2,  group=depth_saba_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_wrap(~depth_saba_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+  scale_fill_manual(values=cbbPalette) + 
+    ggtheme_Plot()  
+  ggsave("barplot_gam_more.jpg", plot=last_plot(), width = 20, height=8, units=c("in"), dpi=500)
+
+cbbPalette <- c("#999999", "#E69F00","#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+
+library(reshape2)
+library(ggpubr)
+
+gam_supp_2 <- gam_supp
+colnames(gam_supp_2) <- c("names", "depth", "bottemp", "salinity", "AMO", "NAO", "substrate", "variability")
+dat.m <- melt(gam_supp_2,id.vars='names', measure.vars=c('bottemp','AMO', 'NAO','depth', 'salinity', 'substrate', 'variability'))
+
+dat.m$value2 <- dat.m$value*100
+data.m <- left_join(specinfo, dat.m, by=c("names"))
+data.m <- as.data.frame(data.m)
+ggbarplot(data.m, x="variable", y="value2", add="mean", facet.by = "depth_saba_simp", fill = "variable", palette=cbbPalette, label = "value2", lab.nb.digits=2, color="variable")+
+    labs(y = "Deviance Explained (%)", x = "variable")+ 
+    ggtheme_Plot()  
+ggsave("barplot_gam_dev.jpg", plot=last_plot(), width = 20, height=8, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=strong.dev.3, y=as.numeric(dist), fill=strong.dev.3)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+ggsave("dist_strong.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(area_diff), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in range size", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=as.numeric(area_diff), fill=depth_saba_simp)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in range size", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=as.numeric(min_diff), fill=depth_saba_simp)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in trailing edge", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(min_diff), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in trailing edge", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=as.numeric(max_diff), fill=depth_saba_simp)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in leading edge", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(max_diff), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in leading edge", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba, y=dev.bt, fill=depth_saba)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "bottom temperature (deviance explained)", x = "species type") + 
+  theme_classic()
+ggsave("dist_bt.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=depth_saba, y=dev.sed, fill=depth_saba)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "substrate (deviance explained)", x = "species type") + 
+  theme_classic()
+ggsave("sub_bt.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=depth_saba, y=dist, fill=depth_saba)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "dist shifted", x = "species type") + 
+  theme_classic()
+ggsave("spec_dist.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.depth, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "depth (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.geb, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "substrate (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.sal, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "sal (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.AMO, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "AMO (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.NAO, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "NAO (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.sdsal, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "sal variability (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data.m, aes(x=dist, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable) + labs(y = "deviance explained", x = "distance shifted")
+#this doesnt show what I am looking for in terms of bt ...
+
+ggplot(data.m, aes(x=area_diff, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable) + labs(y = "deviance explained", x = "change in range size")
+
+  
+ggplot(gam_supp, aes(x=dist, y=dev.sed)) + 
+  geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(gam_supp, aes(x=dist, y=dev.bt)) + 
+  geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+summary(glm(dist~dev.bt, data=gam_supp))
+summary(glm(dist~dev.depth, data=gam_supp))
+summary(glm(dist~dev.sal, data=gam_supp))
+summary(glm(dist~dev.sed, data=gam_supp))
+summary(glm(dist~dev.AMO, data=gam_supp))
+summary(glm(dist~dev.NAO, data=gam_supp))
+summary(glm(dist~dev.sdsal, data=gam_supp))
+summary(glm(dist~dev.sdbt, data=gam_supp))
+summary(glm(dist~dev.sdsst, data=gam_supp))
+
+summary(glm(area_diff~dev.bt, data=gam_supp))
+summary(glm(area_diff~dev.depth, data=gam_supp))
+summary(glm(area_diff~dev.sal, data=gam_supp))
+summary(glm(area_diff~dev.sed, data=gam_supp))
+summary(glm(area_diff~dev.AMO, data=gam_supp))
+summary(glm(area_diff~dev.NAO, data=gam_supp))
+summary(glm(area_diff~dev.sdsal, data=gam_supp))
+summary(glm(area_diff~dev.sdbt, data=gam_supp))
+summary(glm(area_diff~dev.sdsst, data=gam_supp))
+```
+
+#same as above with fewer specs 
+
+
+```{r}
+specnames <- as.vector(supp$names)
+
+#running the same process but with GAM 
+# create data frame to store results
+tot_gam_results <- data.frame()
+tot_gam_stand <- data.frame()
+tot_gam_dev_less <- data.frame(matrix(ncol=11, nrow=1))
+colnames(tot_gam_dev_less) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb")
+
+for (i in 1:length(specnames)) { #for each species in spec_list
+  fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+    tryCatch({
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ 1 +avgdepth")), data=total, family=nb(link="log"))
+          fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, family=nb(link="log"))
+           fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total, family=nb(link="log"))
+           fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total, family=nb(link="log"))
+           fit_NAO <- gam(as.formula(paste(specnames[i],"~ NAO_year")), data=total, family=nb(link="log"))   
+         fit_sed <- gam(as.formula(paste(specnames[i],"~ SEDIMENT")), data=total, family=nb(link="log"))
+         fit_sdsal <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsal")), data=total, family=nb(link="log"))
+         fit_sdbt <- gam(as.formula(paste(specnames[i],"~ SD3x3shortbt")), data=total, family=nb(link="log")) 
+          fit_sdsst <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsst")), data=total, family=nb(link="log"))
+        fit_geb <- gam(as.formula(paste(specnames[i],"~ gebco_SD_2")), data=total, family=nb(link="log"))
+        dev.depth <- summary(fit_depth)$dev.expl
+        dev.bt <- summary(fit_bt)$dev.expl
+        dev.sal <- summary(fit_sal)$dev.expl
+        dev.AMO <- summary(fit_AMO)$dev.expl
+        dev.NAO <- summary(fit_NAO)$dev.expl
+        dev.sed <- summary(fit_sed)$dev.expl
+        dev.sdsal <- summary(fit_sdsal)$dev.expl
+        dev.sdbt <- summary(fit_sdbt)$dev.expl
+        dev.sdsst <- summary(fit_sdsst)$dev.expl
+        dev.geb <- summary(fit_geb)$dev.expl
+        
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed, dev.sdsal, dev.sdbt, dev.sdsst, dev.geb)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev_less <- rbind(tot_gam_dev_less, dev_table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+
+tot_gam_dev_less <- tot_gam_dev_less[1:75,]
+tot_gam_dev_less <- as.data.frame(tot_gam_dev_less)
+tot_gam_dev_less$strong <- colnames(tot_gam_dev_less[2:10])[apply(tot_gam_dev_less[2:10],1,which.max)]
+tot_gam_dev_less$strong <- colnames(tot_gam_dev_less[2:7])[apply(tot_gam_dev_less[2:7],1,which.max)]
+
+#loading the specnames info 
+specinfo <- supp_3 %>% dplyr::select(names, dist, depth_saba_simp, depth_profile_simp)
+
+gam_supp <- left_join(tot_gam_dev_less, specinfo, by=c("names"))
+
+
+gam_supp$strong.dev.2 <- ifelse(gam_supp$strong == "dev.sed", "substrate", ifelse(gam_supp$strong == "dev.bt", "bottemp", ifelse(gam_supp$strong == "dev.depth", "depth", ifelse(gam_supp$strong == "dev.AMO" | gam_supp$strong == "dev.NAO", "climate", ifelse(gam_supp$strong == "dev.sal", "salinity", ifelse(gam_supp$strong == "dev.sdsal" | gam_supp$strong == "dev.sdbt" | gam_supp$strong == "dev.sdsst", "variability", NA))))))
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$strong.dev.2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.bt), gam_supp$depth_saba_simp)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sed), gam_supp$depth_saba_simp)
+
+library(ggsci)
+cbbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+ggplot(data=gam_supp, aes(x= strong.dev.2,  group=depth_saba_simp)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_grid(~depth_saba_simp) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+  scale_fill_manual(values=cbbPalette) + 
+    ggtheme_Plot()  
+  ggsave("barplot_gam_less.jpg", plot=last_plot(), width = 12, height=6, units=c("in"), dpi=500)
+
+cbbPalette <- c("#999999", "#E69F00","#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+
+library(reshape2)
+library(ggpubr)
+
+gam_supp_2 <- gam_supp
+colnames(gam_supp_2) <- c("names", "depth", "bottemp", "salinity", "AMO", "NAO", "substrate", "variability")
+dat.m <- melt(gam_supp_2,id.vars='names', measure.vars=c('bottemp','AMO', 'NAO','depth', 'salinity', 'substrate', 'variability'))
+
+dat.m$value2 <- dat.m$value*100
+data.m <- left_join(specinfo, dat.m, by=c("names"))
+data.m <- as.data.frame(data.m)
+ggbarplot(data.m, x="variable", y="value2", add="mean", facet.by = "depth_saba_simp", fill = "variable", palette=cbbPalette, label = "value2", lab.nb.digits=2, color="variable")+
+    labs(y = "Deviance Explained (%)", x = "variable")+ 
+    ggtheme_Plot()  
+ggsave("barplot_gam_dev.jpg", plot=last_plot(), width = 12, height=6, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(dist), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+ggsave("dist_strong.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.bt, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "bottom temperature (deviance explained)", x = "species type") + 
+  theme_classic()
+ggsave("dist_bt.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.sed, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "substrate (eviance explained)", x = "species type") + 
+  theme_classic()
+ggsave("sub_bt.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dist, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "dist shifted", x = "species type") + 
+  theme_classic()
+ggsave("spec_dist.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+
+ggplot(data.m, aes(x=dist, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+#this doesnt show what I am looking for...
+  
+ggplot(gam_supp, aes(x=dist, y=dev.sed)) + 
+  geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(gam_supp, aes(x=dist, y=dev.bt)) + 
+  geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+```
+
+
+
+
+#selecting based on model performance 
