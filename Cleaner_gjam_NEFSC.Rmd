@@ -5902,3 +5902,1254 @@ ggplot(data.m, aes(x=dist, y=value)) +
 #this doesnt show what I am looking for...
 ```
 
+
+
+
+
+#part2"
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#standardizing ggplot 
+```{r}
+ggtheme_Plot <- function() {
+  theme(
+    plot.title = element_text(size = rel(1), hjust = 0, face = "bold"),
+    panel.background = element_blank(),
+    strip.background = element_blank(),
+    #strip.text       = element_text(size = base_size, face = "italic"),
+    panel.border     = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.ticks = element_blank(),
+ axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+  axis.text.x = element_text(size = 18,
+                               angle = 0,
+                               face = "plain"),
+    axis.text.y = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    legend.key = element_rect(colour = NA, fill = NA),
+    legend.position  = "left",
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 18),
+    strip.text.x = element_text(size = 18),
+    strip.text = element_text(size = 18) 
+ 
+  )
+}
+
+theme_gray
+function (base_size = 11, base_family = "") 
+{
+ half_line <- base_size/2
+theme(
+  line = element_line(colour = "black", size = 0.5, 
+                      linetype = 1, lineend = "butt"), 
+  rect = element_rect(fill = "white", colour = "black",
+                      size = 0.5, linetype = 1),
+  text = element_text(family = base_family, face = "plain",
+                      colour = "black", size = base_size,
+                      lineheight = 0.9,  hjust = 0.5,
+                      vjust = 0.5, angle = 0, 
+                      margin = margin(), debug = FALSE), 
+  
+  axis.line = element_blank(), 
+  axis.text = element_text(size = rel(0.8), colour = "grey30"),
+  axis.text.x = element_text(margin = margin(t = 0.8*half_line/2), 
+                             vjust = 1), 
+  axis.text.y = element_text(margin = margin(r = 0.8*half_line/2),
+                             hjust = 1),
+  axis.ticks = element_line(colour = "grey20"), 
+  axis.ticks.length = unit(half_line/2, "pt"), 
+  axis.title.x = element_text(margin = margin(t = 0.8 * half_line,
+                                          b = 0.8 * half_line/2)),
+  axis.title.y = element_text(angle = 90, 
+                              margin = margin(r = 0.8 * half_line,
+                                          l = 0.8 * half_line/2)),
+  
+  legend.background = element_rect(colour = NA), 
+  legend.margin = unit(0.2, "cm"), 
+  legend.key = element_rect(fill = "grey95", colour = "white"),
+  legend.key.size = unit(1.2, "lines"), 
+  legend.key.height = NULL,
+  legend.key.width = NULL, 
+  legend.text = element_text(size = rel(0.8)),
+  legend.text.align = NULL,
+  legend.title = element_text(hjust = 0), 
+  legend.title.align = NULL, 
+  legend.position = "right", 
+  legend.direction = NULL,
+  legend.justification = "center", 
+  legend.box = NULL, 
+  
+  panel.background = element_rect(fill = "grey92", colour = NA),
+  panel.border = element_blank(), 
+  panel.grid.major = element_line(colour = "white"), 
+  panel.grid.minor = element_line(colour = "white", size = 0.25), 
+  panel.margin = unit(half_line, "pt"), panel.margin.x = NULL, 
+  panel.margin.y = NULL, panel.ontop = FALSE, 
+  
+  strip.background = element_rect(fill = "grey85", colour = NA),
+  strip.text = element_text(colour = "grey10", size = rel(0.8)),
+  strip.text.x = element_text(margin = margin(t = half_line,
+                                              b = half_line)), 
+  strip.text.y = element_text(angle = -90, 
+                              margin = margin(l = half_line, 
+                                              r = half_line)),
+  strip.switch.pad.grid = unit(0.1, "cm"),
+  strip.switch.pad.wrap = unit(0.1, "cm"), 
+  
+  plot.background = element_rect(colour = "white"), 
+  plot.title = element_text(size = rel(1.2), 
+                            margin = margin(b = half_line * 1.2)),
+  plot.margin = margin(half_line, half_line, half_line, half_line),
+  complete = TRUE)
+}
+```
+
+```{r}
+specnames_50  <- read.csv("specnames_318.csv")
+specnames_50 <- specnames_50[1:376,]
+specnames <- as.vector(specnames_50$names)
+```
+
+#5 year time periods
+This is to get at if the environment is changing or if species are changing with the environment. 
+```{r load pacakges}
+install.packages("sp")
+library(sp)
+install.packages("spatialEco")
+library(spatialEco)
+install.packages("geosphere")
+library(geosphere)
+```
+this makes the dataset a spatial object
+```{r}
+total <- read.csv("total.csv")
+
+total_for_sp <- total
+names(total)<-make.names(names(total),unique = TRUE)
+
+#Lets select out the time period chunks we need. 
+total_sp_85_90 <- subset(total, est_year < 1991)
+total_sp_12_17 <- subset(total, est_year > 2011)
+
+
+coordinates(total_sp_85_90) <- ~ decdeg_beglon + decdeg_beglat
+
+coordinates(total_sp_12_17) <- ~ decdeg_beglon + decdeg_beglat
+
+
+```
+
+```{r 5 years}
+#first 5 years 
+spec_coords_85_90 <- data.frame(name=rep(0,80), x=rep(0,80), y=rep(0,80))
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_sp_85_90, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2] 
+  spec_coords_85_90[i,] = c(name, xcord, ycord)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+#2nd 5 year chunk
+
+spec_coords_12_17 <- data.frame(name=rep(0,80), x=rep(0,80), y=rep(0,80))
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+    wt.try <- wt.centroid(total_sp_12_17, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2] 
+  spec_coords_12_17[i,] = c(name, xcord, ycord)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+```
+
+```{r}
+
+#5 year periods 
+all_specs_2 <- cbind(spec_coords_85_90,spec_coords_12_17)
+
+colnames(spec_coords_85_90) <- c("name", "Longitude_1", "Latitude_1")
+colnames(spec_coords_12_17) <- c("name", "Longitude_2", "Latitude_2")
+
+spec_coords_85_90$Latitude_1 <- as.numeric(spec_coords_85_90$Latitude_1)
+spec_coords_85_90$Longitude_1 <- as.numeric(spec_coords_85_90$Longitude_1)
+
+spec_coords_12_17$Latitude_2 <- as.numeric(spec_coords_12_17$Latitude_2)
+spec_coords_12_17$Longitude_2 <- as.numeric(spec_coords_12_17$Longitude_2)
+
+
+#this calculates the geodesic distance between the two points
+
+#for 5 year chunks
+dist_total_5yr <- as.data.frame(distGeo(spec_coords_85_90[2:3], spec_coords_12_17[2:3]))
+dist_total_5yr <- cbind(specnames, dist_total_5yr)
+dist_total_5yr <- cbind(dist_total_5yr, spec_coords_85_90)
+dist_total_5yr <- cbind(dist_total_5yr, spec_coords_12_17)
+
+write.csv(dist_total_5yr, "dist_total_5yr_3.csv")
+
+#lets save all of the mean centroid coordinates to map later
+#write.csv(spec_coords_85_90, "spec_coords_85_90_2.csv")
+#write.csv(spec_coords_12_17, "spec_coords_12_17_2.csv")
+
+dist_total_5yr$dist <- dist_total_5yr$`distGeo(spec_coords_85_90[2:3], spec_coords_12_17[2:3])`
+dist_total_5yr <- subset(dist_total_5yr, dist_total_5yr$Longitude_1 != 0)
+
+dist_total_5yr <- subset(dist_total_5yr, dist_total_5yr$Longitude_2 != 0)
+write.csv(dist_total_5yr, "dist_total_5yr_3.csv")
+
+```
+
+#mean centroids by year 
+```{r}
+total <- read.csv("total.csv")
+total_for_sp <- total
+names(total)<-make.names(names(total),unique = TRUE)
+coordinates(total_for_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+total_for_sp_1985 <- subset(total_for_sp, total_for_sp$est_year==1985)
+total_for_sp_1986 <- subset(total_for_sp, total_for_sp$est_year==1986)
+total_for_sp_1987 <- subset(total_for_sp, total_for_sp$est_year==1987)
+total_for_sp_1988 <- subset(total_for_sp, total_for_sp$est_year==1988)
+total_for_sp_1989 <- subset(total_for_sp, total_for_sp$est_year==1989)
+total_for_sp_1990 <- subset(total_for_sp, total_for_sp$est_year==1990)
+total_for_sp_1991 <- subset(total_for_sp, total_for_sp$est_year==1991)
+total_for_sp_1992 <- subset(total_for_sp, total_for_sp$est_year==1992)
+total_for_sp_1993 <- subset(total_for_sp, total_for_sp$est_year==1993)
+total_for_sp_1994 <- subset(total_for_sp, total_for_sp$est_year==1994)
+total_for_sp_1995 <- subset(total_for_sp, total_for_sp$est_year==1995)
+total_for_sp_1996 <- subset(total_for_sp, total_for_sp$est_year==1996)
+total_for_sp_1997 <- subset(total_for_sp, total_for_sp$est_year==1997)
+total_for_sp_1998 <- subset(total_for_sp, total_for_sp$est_year==1998)
+total_for_sp_1999 <- subset(total_for_sp, total_for_sp$est_year==1999)
+total_for_sp_2000 <- subset(total_for_sp, total_for_sp$est_year==2000)
+total_for_sp_2001 <- subset(total_for_sp, total_for_sp$est_year==2001)
+total_for_sp_2002 <- subset(total_for_sp, total_for_sp$est_year==2002)
+total_for_sp_2003 <- subset(total_for_sp, total_for_sp$est_year==2003)
+total_for_sp_2004 <- subset(total_for_sp, total_for_sp$est_year==2004)
+total_for_sp_2005 <- subset(total_for_sp, total_for_sp$est_year==2005)
+total_for_sp_2006 <- subset(total_for_sp, total_for_sp$est_year==2006)
+total_for_sp_2007 <- subset(total_for_sp, total_for_sp$est_year==2007)
+total_for_sp_2008 <- subset(total_for_sp, total_for_sp$est_year==2008)
+total_for_sp_2009 <- subset(total_for_sp, total_for_sp$est_year==2009)
+total_for_sp_2010 <- subset(total_for_sp, total_for_sp$est_year==2010)
+total_for_sp_2011 <- subset(total_for_sp, total_for_sp$est_year==2011)
+total_for_sp_2012 <- subset(total_for_sp, total_for_sp$est_year==2012)
+total_for_sp_2013 <- subset(total_for_sp, total_for_sp$est_year==2013)
+total_for_sp_2014 <- subset(total_for_sp, total_for_sp$est_year==2014)
+total_for_sp_2015 <- subset(total_for_sp, total_for_sp$est_year==2015)
+total_for_sp_2016 <- subset(total_for_sp, total_for_sp$est_year==2016)
+total_for_sp_2017 <- subset(total_for_sp, total_for_sp$est_year==2017)
+
+spec_coords_1985<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1985) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1985, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1985 <- rbind(spec_coords_1985, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1986<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1986) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1986, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1986 <- rbind(spec_coords_1986, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1987<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1987) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1987, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1987 <- rbind(spec_coords_1987, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1988<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1988) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1988, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1988 <- rbind(spec_coords_1988, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1989<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1989) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1989, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1989 <- rbind(spec_coords_1989, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1990<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1990) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1990, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1990 <- rbind(spec_coords_1990, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1991<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1991) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1991, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1991 <- rbind(spec_coords_1991, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1992<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1992) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1992, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1992 <- rbind(spec_coords_1992, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1993<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1993) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1993, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1993 <- rbind(spec_coords_1993, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1994<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1994) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1994, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1994 <- rbind(spec_coords_1994, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1995<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1995) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1995, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1995 <- rbind(spec_coords_1995, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1996<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1996) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1996, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1996 <- rbind(spec_coords_1996, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1997<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1997) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1997, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1997 <- rbind(spec_coords_1997, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1998<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1998) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1998, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1998 <- rbind(spec_coords_1998, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_1999<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_1999) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_1999, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_1999 <- rbind(spec_coords_1999, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2000<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2000) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2000, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2000 <- rbind(spec_coords_2000, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2001<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2001) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2001, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2001 <- rbind(spec_coords_2001, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+spec_coords_2002<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2002) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2002, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2002 <- rbind(spec_coords_2002, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2003<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2003) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2003, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2003 <- rbind(spec_coords_2003, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2004<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2004) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2004, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2004 <- rbind(spec_coords_2004, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2005<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2005) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2005, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2005 <- rbind(spec_coords_2005, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2006<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2006) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2006, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2006 <- rbind(spec_coords_2006, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2007<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2007) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2007, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2007 <- rbind(spec_coords_2007, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2008<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2008) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2008, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2008 <- rbind(spec_coords_2008, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2009<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2009) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2009, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2009 <- rbind(spec_coords_2009, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2010<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2010) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2010, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2010 <- rbind(spec_coords_2010, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2011<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2011) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2011, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2011 <- rbind(spec_coords_2011, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2012<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2012) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2012, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2012 <- rbind(spec_coords_2012, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2013<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2013) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2013, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2013 <- rbind(spec_coords_2013, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2014<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2014) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2014, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2014 <- rbind(spec_coords_2014, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2015<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2015) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2015, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2015 <- rbind(spec_coords_2015, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2016<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2016) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2016, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2016 <- rbind(spec_coords_2016, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+spec_coords_2017<- data.frame(matrix(ncol=3, nrow=1))
+colnames(spec_coords_2017) <- c("names", "xcord", "ycord")
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_for_sp_2017, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2]
+  table <- list(name, xcord, ycord)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "xcord", "ycord")
+  spec_coords_2017 <- rbind(spec_coords_2017, table)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+
+```
+
+
+```{r}
+#getting out sequential distances 
+specnames_df <- specnames_50[,1:10]
+dist_large <- left_join(specnames_df, spec_coords_1985, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1986, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1987, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1988, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1989, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1990, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1991, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1992, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1993, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1994, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1995, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1996, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1997, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1998, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_1999, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2000, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2001, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2002, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2003, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2004, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2005, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2006, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2007, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2008, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2009, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2010, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2011, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2012, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2013, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2014, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2015, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2016, by=c("names"))
+dist_large <- left_join(dist_large, spec_coords_2017, by=c("names"))
+
+dist_large_2 <- dist_large
+#this calculates the geodesic distance between the two points
+for (i in seq(from=2, to=78, by=2)) { #for each column in dist_large
+  tryCatch({#for each species in spec_list
+  z <- 11 + i
+  c <- 12 + i
+  disty <- as.data.frame(distGeo(dist_large[11:12], dist_large[z:c]))
+
+  dist_large_2 = cbind(dist_large_2, disty)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+#The above code works that is awesome!! could try doing it for the second year too 
+names(dist_large_2) <- make.unique(names(dist_large_2), sep="_")
+#pulling out a test group 
+dist_large_2 <- left_join(dist_large_2, specinfo, by=c("names"))
+
+test_dist <- dist_large_2 %>% dplyr::filter(names=="Anchoa.mitchilli..bay.anchovy."| names=="Gasterosteus.aculeatus..threespine.stickleback." | names == "Ulvaria.subbifurcata..radiated.shanny." | names=="Pholis.gunnellus..rock.gunnel." | names== "Glyptocephalus.cynoglossus..witch.flounder."| names=="Sebastes.fasciatus..Acadian.redfish." | names=="Scomberomorus.cavalla..king.mackerel." | names=="Triglops.murrayi..moustache.sculpin." | names=="Decapterus.macarellus..mackerel.scad." | names =="Lumpenus.lampretaeformis..snakeblenny.")
+
+
+test_dist_2 <- test_dist[,81:111]
+test_dist_2$names <- test_dist$names
+rownames(test_dist_2) <- test_dist_2$names
+test_dist_2 <- t(test_dist_2)
+test_dist_2 <-test_dist_2[1:31,]
+test_dist_2 <-as.data.frame(test_dist_2)
+df1 <- test_dist_2
+test_dist_2 <- mutate_all(df1, function(x) as.numeric(as.character(x)))
+test_dist_2$ID <- seq.int(nrow(test_dist_2))
+
+#demersal
+par(mfrow=c(2,5))
+plot(test_dist_2$Glyptocephalus.cynoglossus..witch.flounder.)
+abline(lm(test_dist_2$Glyptocephalus.cynoglossus..witch.flounder.~ test_dist_2$ID))
+
+plot(test_dist_2$Sebastes.fasciatus..Acadian.redfish.)
+abline(lm(test_dist_2$Sebastes.fasciatus..Acadian.redfish.~ test_dist_2$ID))
+
+plot(test_dist_2$Triglops.murrayi..moustache.sculpin.)
+abline(lm(test_dist_2$Triglops.murrayi..moustache.sculpin.~ test_dist_2$ID))
+
+plot(test_dist_2$Pholis.gunnellus..rock.gunnel.)
+abline(lm(test_dist_2$Pholis.gunnellus..rock.gunnel.~ test_dist_2$ID))
+
+plot(test_dist_2$Lumpenus.lampretaeformis..snakeblenny.)
+abline(lm(test_dist_2$Lumpenus.lampretaeformis..snakeblenny.~ test_dist_2$ID))
+
+#pelagic
+plot(test_dist_2$Anchoa.mitchilli..bay.anchovy.)
+abline(lm(test_dist_2$Anchoa.mitchilli..bay.anchovy.~ test_dist_2$ID))
+
+plot(test_dist_2$Scomberomorus.cavalla..king.mackerel.)
+abline(lm(test_dist_2$Scomberomorus.cavalla..king.mackerel.~ test_dist_2$ID))
+
+plot(test_dist_2$Gasterosteus.aculeatus..threespine.stickleback.)
+abline(lm(test_dist_2$Gasterosteus.aculeatus..threespine.stickleback.~ test_dist_2$ID))
+
+plot(test_dist_2$Ulvaria.subbifurcata..radiated.shanny.)
+abline(lm(test_dist_2$Ulvaria.subbifurcata..radiated.shanny.~ test_dist_2$ID))
+
+plot(test_dist_2$Decapterus.macarellus..mackerel.scad.)
+abline(lm(test_dist_2$Decapterus.macarellus..mackerel.scad.~ test_dist_2$ID))
+
+test_dist_2 <- dist_large_2[,81:111]
+test_dist_2$names <- dist_large_2$names
+rownames(test_dist_2) <- test_dist_2$names
+test_dist_2 <- t(test_dist_2)
+test_dist_2 <-test_dist_2[1:31,]
+test_dist_2 <-as.data.frame(test_dist_2)
+df1 <- test_dist_2
+test_dist_2 <- mutate_all(df1, function(x) as.numeric(as.character(x)))
+test_dist_2$ID <- seq.int(nrow(test_dist_2))
+
+df <- test_dist_2
+colNames <- names(df)[1:376]
+for(i in colNames){
+  plt <- ggplot(df, aes_string(y = "ID", x=i)) +
+    geom_point(color="#B20000") +
+    geom_smooth(method=lm, alpha=0.25, color="black", fill="black")
+  print(plt)
+  Sys.sleep(2)
+}
+
+#maybe get out coefficients and map that 
+specnames <- as.vector(colNames)
+glm_dist <- data.frame(matrix(ncol=3, nrow=1))
+colnames(glm_dist) <- c("names", "coef", "sig")
+
+for (i in 1:length(specnames)){     
+  tryCatch({#for each species in spec_list
+  fit <- lm(as.formula(paste(specnames[i],"~ ID")), data=test_dist_2)
+  coef <- summary(fit)$coeff[2]
+  pcoef <- coef(summary(fit))[2,4]
+  names <- specnames[i]
+  table  <- list(names, coef, pcoef)
+  table <- as.data.frame(table)
+  colnames(table) <- c("names", "coef", "sig")
+
+        glm_dist <- rbind(glm_dist, table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+glm_dist <- left_join(glm_dist, specinfo, by=c("names"))
+glm_dist$depth_saba_2 <- ifelse(glm_dist$depth_saba == "benthic", "demersal", as.character(glm_dist$depth_saba))
+
+glm_dist_orig <- glm_dist 
+glm_dist <- subset(glm_dist, glm_dist$names != "Symphurus.diomedeanus..spottedfin.tonguefish.")
+ggplot(data=glm_dist, aes(x=depth_saba_2, y=coef, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + stat_compare_means(comparisons = my_comparisons, method="wilcox.test") +
+    labs(y = "coef", x = "species type") + 
+  theme_classic()
+
+pairwise.wilcox.test(as.numeric(glm_dist$coef), glm_dist$depth_saba_2)
+
+#and map 5 year minimum convex hull 
+
+```
+
+
+```{r}
+plot(total$est_year, total$SD3x3shortsst)
+abline(lm(total$SD3x3shortsst ~ total$est_year))
+summary(lm(total$SD3x3shortsst ~ total$est_year))
+
+
+plot(total$est_year, total$SD3x3shortsal)
+abline(lm(total$SD3x3shortsal ~ total$est_year))
+summary(lm(total$SD3x3shortsal ~ total$est_year))
+```
+
+
+#plotting gams 
+```{r}
+tot_gam_dev_30 <- tot_gam_dev_30[2:377,]
+
+tot_gam_dev_30$strong <- colnames(tot_gam_dev_30[2:13])[apply(tot_gam_dev_30[2:13],1,which.max)]
+
+
+specnames_30  <- read.csv("specnames_318.csv")
+specnames_30 <- specnames_30[,1:9]
+specnames_30 <- specnames_30[1:376,]
+specnames_30 <- left_join(tot_gam_r_2, specnames_30, by=c("names"))
+
+specnames_30 <- subset(specnames_30, specnames_30$dev >=.3)
+
+#add distance info 
+dist_total <- read.csv("dist_total_full_400.csv")
+dist_info <- dist_total[,2:3] 
+dist_info$dist_15yr <- dist_info$distGeo.spec_coords_1.2.3...spec_coords_2.2.3..
+dist_info_5yr <- dist_total_5yr
+dist_info_5yr$dist_5yr <- dist_info_5yr$dist
+dist_info_5yr <- dist_info_5yr %>% dplyr::select(specnames, dist_5yr)
+
+tot_gam_dev_30$sum_dev <- rowSums(tot_gam_dev_30[,2:13])
+
+#convex info 
+convex_1 <- read.csv("spechull/homerange_1.csv")
+convex_2 <- read.csv("spechull/homerange_2.csv")
+convex_1 <- convex_1 %>% dplyr::select(id, names, area, EXT_MIN_Y, EXT_MAX_Y)
+convex_2 <- convex_2 %>% dplyr::select(id, names, area, EXT_MIN_Y, EXT_MAX_Y)
+colnames(convex_1) <- c("id", "names", "area_1", "min_y_1", "max_y_1")
+colnames(convex_2) <- c("id", "names", "area_2", "min_y_2", "max_y_2")
+convex1 <- merge(convex_2, convex_1, by="names")
+convex1$area_diff <- convex1$area_2 - convex1$area_1
+convex1$min_diff <- convex1$min_y_2 - convex$min_y_1
+convex1$max_diff <- convex1$max_y_2 - convex1$max_y_1
+
+convex_1_5 <- read.csv("homerange_1_5yr.csv")
+convex_2_5 <- read.csv("homerange_2_5yr.csv")
+convex_1_5 <- convex_1_5 %>% dplyr::select(id, area, EXT_MIN_Y, EXT_MAX_Y)
+convex_2_5 <- convex_2_5 %>% dplyr::select(id, area, EXT_MIN_Y, EXT_MAX_Y)
+colnames(convex_1_5) <- c("names", "area_1", "min_y_1", "max_y_1")
+colnames(convex_2_5) <- c("names", "area_2", "min_y_2", "max_y_2")
+convex <- merge(convex_2_5, convex_1_5, by="names")
+convex$area_diff_5yr <- convex$area_2 - convex$area_1
+convex$min_diff_5yr <- convex$min_y_2 - convex$min_y_1
+convex$max_diff_5yr <- convex$max_y_2 - convex$max_y_1
+
+convex <- left_join(convex1, convex, by=c("id.x"="names"))
+
+specinfo <- left_join(specnames_30, dist_info, by=c("names"="specnames_dist"))
+specinfo <- left_join(specinfo, dist_info_5yr, by=c("names"="specnames"))
+specinfo <- left_join(specinfo, convex, by=c("names"))
+#specinfo$dist <- specinfo$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`
+gam_supp <- left_join(tot_gam_dev_30, specinfo, by=c("names"))
+
+#gam_supp$dist <- gam_supp$distGeo.spec_coords_1.2.3...spec_coords_2.2.3..
+gam_supp_orig <- gam_supp
+write.csv(gam_supp_orig, "gam_supp.csv")
+
+#adjusting specnames to exclude families and only include fish (can exclude elasmobranchs and only do teleosts too) Could just do phylum chordata which is all fish and sharks and rays but not octopods, mollusks, gastropods, or cephalopods)
+gam_supp<- subset(gam_supp, gam_supp$question != "family")
+#gam_supp<- subset(gam_supp, gam_supp$question != "yes")
+gam_supp<- subset(gam_supp, gam_supp$fish_type == "fish" |  gam_supp$fish_type == "elasmobranch")
+#| gam_supp$question != "yes")
+
+#try combining benthic and demersal 
+gam_supp$depth_saba_2 <- ifelse(gam_supp$depth_saba == "benthic", "demersal", as.character(gam_supp$depth_saba))
+#gam_supp<- subset(gam_supp, gam_supp$depth_saba != "reef")
+
+gam_supp$strong.dev.2 <- ifelse(gam_supp$strong == "dev.sed", "substrate", ifelse(gam_supp$strong == "dev.bt", "bottemp", ifelse(gam_supp$strong == "dev.depth", "depth", ifelse(gam_supp$strong == "dev.AMO" | gam_supp$strong == "dev.NAO", "climate", ifelse(gam_supp$strong == "dev.sal", "salinity", ifelse(gam_supp$strong == "dev.sdsal", "sal variability", ifelse(gam_supp$strong=="dev.sdsst", "sst variability", ifelse(gam_supp$strong=="dev.sst", "sst", ifelse(gam_supp$strong=="dev.ssal", "ssal", ifelse(gam_supp$strong=="dev.geb", "rugosity", NA))))))))))
+
+gam_supp <- gam_supp %>% dplyr::select(-dev.null)
+#gam_supp <- subset(gam_supp, gam_supp$names !="Hypleurochilus.geminatus..crested.blenny.")
+gam_supp_3 <- gam_supp[1:285,]
+gam_supp_orig <- gam_supp
+write.csv(gam_supp_5yr, "gam_supp_5yrcurrent.csv")
+
+
+gam_supp <- gam_supp_orig
+gam_supp_5yr <- subset(gam_supp, (!is.na(gam_supp$dist_5yr)))
+
+#without variability 
+gam_supp_5yr <- gam_supp_5yr %>%  dplyr::select(-strong, -dev.AMO, -dev.NAO, -dev.sdbt, -dev.sdsal, -dev.sdsst)
+gam_supp_5yr$strong <- colnames(gam_supp_5yr[2:8])[apply(gam_supp_5yr[2:8],1,which.max)]
+
+gam_supp_5yr$strong.dev.2 <- ifelse(gam_supp_5yr$strong == "dev.sed", "substrate", ifelse(gam_supp_5yr$strong == "dev.bt", "bottom temperature", ifelse(gam_supp_5yr$strong == "dev.depth", "depth", ifelse(gam_supp_5yr$strong == "dev.sal", "bottom salinity", ifelse(gam_supp_5yr$strong=="dev.sst", "surface temperature", ifelse(gam_supp_5yr$strong=="dev.ssal", "surface salinity", ifelse(gam_supp_5yr$strong=="dev.geb", "rugosity", NA)))))))
+```
+
+#plots
+```{r}
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist_5yr), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dist_15yr), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$area_diff_5yr), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$min_diff_5yr), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$max_diff_5yr), gam_supp$depth_saba_2)
+
+
+pairwise.wilcox.test(as.numeric(gam_supp$area_diff), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$min_diff), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$max_diff), gam_supp$depth_saba_2)
+
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$strong.dev.2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.bt), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sed), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.depth), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sal), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.NAO), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.AMO), gam_supp$depth_saba_2)
+
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dist), gam_supp_5yr$strong.dev.2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.bt), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sed), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.depth), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.geb), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sal), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.NAO), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.AMO), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sst), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sdsal), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sdsst), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sdbt), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.ssal), gam_supp_5yr$depth_saba_2)
+
+
+
+library(ggsci)
+cbbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+ggplot(data=gam_supp_5yr, aes(x= strong.dev.2,  group=depth_saba_2)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") + 
+  coord_flip() +
+    facet_wrap(~depth_saba_2) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none")  +
+    ggtheme_Plot()  
+  ggsave("barplot_gam_more.jpg", plot=last_plot(), width = 20, height=8, units=c("in"), dpi=500)
+
+cbbPalette <- c("#999999", "#E69F00","#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+
+library(reshape2)
+library(ggpubr)
+
+gam_supp_2 <- gam_supp_5yr
+colnames(gam_supp_2) <- c("names", "depth", "bottom temperature", "bottom salinity", "substrate", 'rugosity', 'surface temperature', 'surface salinity')
+
+dat.m <- melt(gam_supp_2,id.vars='names', measure.vars=c("depth", "substrate", 'surface temperature',"bottom temperature",  "bottom salinity", 'surface salinity'))
+levels(dat.m$variable) <- gsub(" ", "\n", levels(dat.m$variable))
+
+dat.m$value2 <- dat.m$value*100
+data.m <- left_join(gam_supp_5yr, dat.m, by=c("names"))
+data.m <- as.data.frame(data.m)
+ggbarplot(data.m, x="variable", y="value2", add="mean", facet.by = "depth_saba_2", fill = "variable", label = "value2", lab.nb.digits=1, color="variable", orientation = "horiz", lab.size = 8, lab.hjust=1, xlim=c(0,100)) +
+    labs(y = "Average Deviance explained (%)", x = "Variable")+ 
+ theme_classic(base_size=22) +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1)), 
+        strip.text = element_text(size = rel(1)), 
+        plot.margin = margin(2, 2, 2, 2, "cm")) + scale_fill_simpsons() + scale_color_simpsons() +
+  theme(legend.position = "none") +
+  ggsave(path = "figs", filename= "bar_deviance_by_spec_var.jpg", plot=last_plot(), width = 20, height=10, units=c("in"), dpi=500)
+
+
+my_comparisons <- list( c("pelagic", "reef"), c("demersal", "reef"), c("demersal", "pelagic"))
+#my_comparisons <- list(c("demersal", "pelagic"))
+
+#install.packages("ggthemes") # Install 
+#library(ggthemes) # Load
+
+
+#all deviance explained 
+ggplot(data=data.m, aes(x=depth_saba_2, y=value, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "Deviance explained (%)", x = "Species type") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test", label = "p.format", size=7) + labs(fill = "Species Type") + 
+  facet_wrap(~variable) + 
+ theme_classic(base_size=22) +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1)), 
+        strip.text = element_text(size = rel(1)), 
+        panel.spacing = unit(1, "cm")) + 
+  theme(legend.position = "none") + scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
+  ggsave(path = "figs", filename= "deviance_by_spec_var.jpg", plot=last_plot(), width = 20, height=18, units=c("in"), dpi=500)
+
+
+#all distance 
+gam_supp_5yr$area_diff_5yr_m <- gam_supp_5yr$area_diff_5yr*10000
+gam_supp_5yr$centroid_shift_km <- gam_supp_5yr$dist_5yr/1000
+gam_supp_3 <- gam_supp_5yr %>% dplyr::select(names, centroid_shift_km, area_diff_5yr_m, min_diff_5yr, max_diff_5yr)
+colnames(gam_supp_3) <- c("names", "Mean centroid shift (km)", "Range size change (meters squared)", "Southern range shifted (latitude)", "Northern range shifted (latitude)")
+
+dat.m.2 <- melt(gam_supp_3,id.vars='names', measure.vars=c("Mean centroid shift (km)", "Range size change (meters squared)", "Southern range shifted (latitude)", "Northern range shifted (latitude)"))
+
+data.m.2 <- left_join(gam_supp_5yr, dat.m.2, by=c("names"))
+data.m.2 <- as.data.frame(data.m.2)
+
+ggplot(data=data.m.2, aes(x=depth_saba_2, y=value, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "", x = "Species type") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test", label = "p.format", size=7) + labs(fill = "Species Type") + 
+  facet_wrap(~variable, scales = "free") + 
+ theme_classic(base_size=22) +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1)), 
+        strip.text = element_text(size = rel(1)), 
+        panel.spacing = unit(1, "cm")) + 
+  theme(legend.position = "none") + scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9")) + 
+  ggsave(path = "figs", filename= "distance_by_spec_var.jpg", plot=last_plot(), width = 20, height=20, units=c("in"), dpi=500)
+
+
+ggplot(data=gam_supp_5yr, aes(x=depth_saba_simp, y=dist_5yr, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "Distance shifted", x = "species type") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=area_diff, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "range shifted", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=min_diff, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "southern range extent shifted", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=max_diff, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "norther range extent shifted", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp_5yr, aes(x=depth_saba_2, y=area_diff_5yr, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + stat_compare_means(comparisons = my_comparisons, method="wilcox.test") + 
+    labs(y = "range shifted", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp_5yr, aes(x=depth_saba_2, y=min_diff_5yr, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "southern range extent shifted", x = "species type") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test") + 
+  theme_classic()
+
+ggplot(data=gam_supp_5yr, aes(x=depth_saba_2, y=max_diff_5yr, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "norther range extent shifted", x = "species type") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test") + 
+  theme_classic()
+
+#dist vs deviance 
+ggplot(data.m, aes(x=dist_5yr, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_wrap(~variable)
+
+ggplot(data.m, aes(x=area_diff, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+ggplot(data.m, aes(x=min_diff, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+ggplot(data.m, aes(x=max_diff, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+ggplot(total, aes(x=est_year, y=SD3x3shortsst)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+```
+
+#examining directionality of variability 
+
+```{r}
+gam_supp <- gam_supp_5yr
+gam_supp$sst_var_dir <- ifelse(gam_supp$dev.sdsst>0, "positive", "negative")
+gam_supp$sal_var_dir <- ifelse(gam_supp$dev.sdsal>0, "positive", "negative")
+gam_supp$bt_var_dir <- ifelse(gam_supp$dev.sdbt>0, "positive", "negative")
+
+#okay so all of these are positive, but look at those combined with coefficient for sst, sal, and bt to see if they prefer warm, cool, or saline, fresh waters. 
+
+
+gam_supp$sst_dir <- ifelse(gam_supp$coef.sst>0, "warm", "cool")
+gam_supp$bt_dir <- ifelse(gam_supp$coef.bt>0, "warm", "cool")
+gam_supp$bsal_dir <- ifelse(gam_supp$coef.sal>0, "saline", "fresh")
+gam_supp$ssal_dir <- ifelse(gam_supp$coef.ssal>0, "saline", "fresh")
+gam_supp$depth_dir <- ifelse(gam_supp$coef.depth>0, "deep", "shallow")
+
+ggplot(data=gam_supp, aes(x=sst_dir, y=dev.sdsst, fill=sst_dir)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + facet_wrap(~depth_saba_2)+ scale_fill_manual(values=c("lightblue", "salmon"))
+
+ggplot(data=gam_supp, aes(x=bt_dir, y=dev.sdbt, fill=bt_dir)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + facet_wrap(~depth_saba_2) + scale_fill_manual(values=c("lightblue", "salmon"))
+
+ggplot(data=gam_supp, aes(x=bsal_dir, y=dev.sdsal, fill=bsal_dir)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + facet_wrap(~depth_saba_2)+ scale_fill_manual(values=c("lightblue", "salmon"))
+
+ggplot(data=gam_supp, aes(x=depth_dir, y=dev.depth, fill=depth_dir)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + facet_wrap(~depth_saba_2)+ scale_fill_manual(values=c("lightblue", "salmon"))
+
+ggplot(data=gam_supp, aes(x=sst_dir, y=dev.sst, fill=sst_dir)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + facet_wrap(~depth_saba_2)+ scale_fill_manual(values=c("lightblue", "salmon"))
+
+ggplot(data=gam_supp, aes(x=bt_dir, y=dev.bt, fill=bt_dir)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + facet_wrap(~depth_saba_2)+ scale_fill_manual(values=c("lightblue", "salmon"))
+
+ggplot(data=gam_supp, aes(x=ssal_dir, y=dev.ssal, fill=ssal_dir)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) + facet_wrap(~depth_saba_2)+ scale_fill_manual(values=c("lightblue", "salmon"))
+```
+
+spatial reef 
+```{r}
+specnames_reef <- subset(specnames_30, specnames_30$depth_saba =="reef")
+specnames_reef <- as.vector(specnames_reef[,1])
+
+total_reef <- total[,specnames_reef]
+total_dist <- total %>% dplyr::select(est_year, decdeg_beglon, decdeg_beglat)
+
+total_reef <- cbind(total_reef, total_dist)
+write.csv(total_reef, file="reef.csv")
+
+```
+
+
