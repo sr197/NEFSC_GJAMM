@@ -1562,7 +1562,7 @@ sum_tot_twenty <-sum_tot[ which(sum_tot$sums_1 > 49
 
 sum_tot_with_orig <- left_join(sum_tot, specnames_orig, by=c("V1"="specNames"))
 
-specnames_large <- as.vector(sum_tot_nozero$V1)
+specnames_dist <- as.vector(sum_tot_nozero$V1)
 #total_sp_85_90 <- subset(total, est_year < 1991)
 #total_sp_12_17 <- subset(total, est_year > 2011)
 
@@ -1656,10 +1656,10 @@ weighted centroid
 ```{r weighted centroid}
 #first time chunk 
 
-spec_coords_1 <- data.frame(name=rep(0,115), x=rep(0,115), y=rep(0,115))
+spec_coords_1 <- data.frame(name=rep(0,400), x=rep(0,400), y=rep(0,400))
 
-for (i in 1:length(specnames)) { #for each species in spec_list
-  wt.try <- wt.centroid(total_sp_1, specnames[i])
+for (i in 1:length(specnames_dist)) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_1, specnames_dist[i])
   name <- specnames[i]
   xcord <- wt.try@coords[1]
   ycord <- wt.try@coords[2] 
@@ -1668,9 +1668,9 @@ for (i in 1:length(specnames)) { #for each species in spec_list
 
 #For the 2nd time chunk
 
-spec_coords_2 <- data.frame(name=rep(0,115), x=rep(0,115), y=rep(0,115))
-for (i in 1:length(specnames)) { #for each species in spec_list
-  wt.try <- wt.centroid(total_sp_2, specnames[i])
+spec_coords_2 <- data.frame(name=rep(0,400), x=rep(0,400), y=rep(0,400))
+for (i in 1:length(specnames_dist)) { #for each species in spec_list
+  wt.try <- wt.centroid(total_sp_2, specnames_dist[i])
   name <- specnames[i]
   xcord <- wt.try@coords[1]
   ycord <- wt.try@coords[2] 
@@ -1733,12 +1733,12 @@ this calculates the geodesic distance between the two points
 ```{r geodesic distance}
 
 dist_total <- as.data.frame(distGeo(spec_coords_1[2:3], spec_coords_2[2:3]))
-dist_total <- cbind(specnames, dist_total)
+dist_total <- cbind(specnames_dist, dist_total)
 dist_total <- cbind(dist_total, spec_coords_1)
 dist_total <- cbind(dist_total, spec_coords_2)
 
-write.csv(dist_total, "dist_total_full_115.csv")
-
+write.csv(dist_total, "dist_total_full_400.csv")
+dist_total <- read.csv("dist_total_full_400.csv")
 #lets save all of the mean centroid coordinates to map later
 write.csv(spec_coords_1, "spec_coords_1_full_2.csv")
 write.csv(spec_coords_2, "spec_coords_2_full_2.csv")
@@ -1880,6 +1880,68 @@ library(rgdal)
 writeOGR(spec_hull_tot, layer= "homerange", driver="ESRI Shapefile", dsn="spechull")
 writeOGR(spec_hull_first, layer= "homerange_1", driver="ESRI Shapefile", dsn="spechull")
 writeOGR(spec_hull_second, layer= "homerange_2", driver="ESRI Shapefile", dsn="spechull")
+
+
+
+#5 year time periods 
+total_big <- rbind(fall, spring)
+total_big_1 <- as.data.frame(total_big)
+total_big_1 <- subset(total_big_1, total_big_1$est_year >= 1984)
+
+
+total_big_first <- subset(total_big_1, est_year < 1991)
+total_big_second <- subset(total_big_1, est_year > 2011)
+
+#first
+total_big_first <- total_big_first %>% 
+  dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
+  rename(ID=scientific_name)
+
+
+#check if any specs have less than 5 relocations using dplyr
+total_big_first <- subset(total_big_first, ID %in% names(which(table(ID) >= 5)))
+total_big_first$ID <- factor(total_big_first$ID)
+
+#make a spatial object
+total_big_first_sp <- total_big_first %>% drop_na()
+coordinates(total_big_first_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+library(adehabitatHR)
+
+
+spec_hull_first <- mcp(total_big_first_sp[,1], percent=95)
+spec_hull_first_area <- as.data.frame(spec_hull_first[])
+plot(spec_hull_first)
+
+#second
+total_big_second <- total_big_second %>% 
+  dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
+  rename(ID=scientific_name)
+
+
+#check if any specs have less than 5 relocations using dplyr
+total_big_second <- subset(total_big_second, ID %in% names(which(table(ID) >= 5)))
+total_big_second$ID <- factor(total_big_second$ID)
+
+#make a spatial object
+total_big_second_sp <- total_big_second %>% drop_na()
+coordinates(total_big_second_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+library(adehabitatHR)
+
+
+spec_hull_second <- mcp(total_big_second_sp[,1], percent=95)
+spec_hull_second_area <- as.data.frame(spec_hull_second[])
+plot(spec_hull_first)
+plot(spec_hull_second)
+
+write.csv(spec_hull_first_area, file="spec_hull_first5yr_area.csv")
+write.csv(spec_hull_second_area, file="spec_hull_second5yr_area.csv")
+
+library(rgdal)
+#write these out to shapefiles
+writeOGR(spec_hull_first, layer= "homerange_1_5yr", driver="ESRI Shapefile", dsn="spechull")
+writeOGR(spec_hull_second, layer= "homerange_2_5yr", driver="ESRI Shapefile", dsn="spechull")
 
 
 ```
@@ -5421,3 +5483,422 @@ ggplot(gam_supp, aes(x=dist, y=dev.bt)) +
 
 
 #selecting based on model performance 
+```{r}
+
+specnames <- as.vector(tot_by_m$scientific_name)
+tot_gam_r_2 <- data.frame(matrix(ncol=3, nrow=1))
+colnames(tot_gam_r_2) <- c("names", "rsq", "dev")
+
+for (i in 1:length(specnames)) {     
+  tryCatch({#for each species in spec_list
+  fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + SED_TYPE + gebco_SD_2 + surfsalin + surftemp")), data=total, family=nb(link="log"))
+  r <- summary(fit)$r.sq
+  dev <- summary(fit)$dev.expl
+        dev_table <- list("null", r, dev)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "rsq", "dev")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_r_2 <- rbind(tot_gam_r_2, dev_table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+
+#deviance explained might be better than r - squared for non gaussian families
+  #https://m-clark.github.io/generalized-additive-models/technical.html#a-detailed-example
+
+#select species whose deviance explained is greater than 50% 
+
+
+gam_50 <- subset(tot_gam_r, tot_gam_r$dev>=.50)
+specnames_r <- as.vector(gam_50$names)
+
+gam_30 <- subset(tot_gam_r_2, tot_gam_r_2$dev>=.30)
+specnames_more <- as.vector(gam_30$names)
+
+tot_gam_dev_50 <- data.frame(matrix(ncol=12, nrow=1))
+tot_gam_dev_30 <- data.frame(matrix(ncol=25, nrow=1))
+colnames(tot_gam_dev_30) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb", "dev.sst", "dev.ssal", "dev.null", "coef.depth", "coef.bt", "coef.sal", "coef.AMO", "coef.NAO", "coef.sdsal", "coef.sdbt", "coef.sdsst", "coef.geb", "coef.sst", "coef.ssal")
+specnames <- specnames
+for (i in 1:length(specnames)) { #for each species in spec_list
+  #fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+    tryCatch({
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ avgdepth")), data=total, family=nb(link="log"))
+          fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, family=nb(link="log"))
+           fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total, family=nb(link="log"))
+           fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total, family=nb(link="log"))
+           fit_NAO <- gam(as.formula(paste(specnames[i],"~ NAO_year")), data=total, family=nb(link="log"))   
+         fit_sed <- gam(as.formula(paste(specnames[i],"~ SEDIMENT")), data=total, family=nb(link="log"))
+         fit_sdsal <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsal")), data=total, family=nb(link="log"))
+         fit_sdbt <- gam(as.formula(paste(specnames[i],"~ SD3x3shortbt")), data=total, family=nb(link="log")) 
+          fit_sdsst <- gam(as.formula(paste(specnames[i],"~ SD3x3shortsst")), data=total, family=nb(link="log"))
+        fit_geb <- gam(as.formula(paste(specnames[i],"~ gebco_SD_2")), data=total, family=nb(link="log"))
+        fit_sst <- gam(as.formula(paste(specnames[i],"~ surftemp")), data=total, family=nb(link="log"))
+        fit_ssal <- gam(as.formula(paste(specnames[i],"~ surfsalin")), data=total, family=nb(link="log"))
+
+        fit_null <- gam(as.formula(paste(specnames[i],"~ 1")), data=total, family=nb(link="log"))
+        dev.depth <- summary(fit_depth)$dev.expl
+        dev.bt <- summary(fit_bt)$dev.expl
+        dev.sal <- summary(fit_sal)$dev.expl
+        dev.AMO <- summary(fit_AMO)$dev.expl
+        dev.NAO <- summary(fit_NAO)$dev.expl
+        dev.sed <- summary(fit_sed)$dev.expl
+        dev.sdsal <- summary(fit_sdsal)$dev.expl
+        dev.sdbt <- summary(fit_sdbt)$dev.expl
+        dev.sdsst <- summary(fit_sdsst)$dev.expl
+        dev.geb <- summary(fit_geb)$dev.expl
+        dev.null <- summary(fit_null)$dev.expl
+        dev.sst <- summary(fit_sst)$dev.expl
+       dev.ssal <- summary(fit_ssal)$dev.expl
+
+        coef.depth <- summary(fit_depth)$p.coeff[2]
+        coef.bt<- summary(fit_bt)$p.coeff[2]
+        coef.sal <- summary(fit_sal)$p.coeff[2]
+        coef.AMO <- summary(fit_AMO)$p.coeff[2]
+        coef.NAO <- summary(fit_NAO)$p.coeff[2]
+        coef.sdsal <- summary(fit_sdsal)$p.coeff[2]
+        coef.sdbt <- summary(fit_sdbt)$p.coeff[2]
+        coef.sdsst <- summary(fit_sdsst)$p.coeff[2]
+        coef.geb <- summary(fit_geb)$p.coeff[2]
+        coef.sst <- summary(fit_sst)$p.coeff[2]
+        coef.ssal <- summary(fit_ssal)$p.coeff[2]
+        
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed, dev.sdsal, dev.sdbt, dev.sdsst, dev.geb, dev.sst, dev.ssal, dev.null, coef.depth, coef.bt, coef.sal, coef.AMO, coef.NAO, coef.sdsal, coef.sdbt, coef.sdsst, coef.geb, coef.sst, coef.ssal)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.sdsal", "dev.sdbt", "dev.sdsst", "dev.geb", "dev.sst", "dev.ssal", "dev.null", "coef.depth", "coef.bt", "coef.sal", "coef.AMO", "coef.NAO", "coef.sdsal", "coef.sdbt", "coef.sdsst", "coef.geb", "coef.sst", "coef.ssal")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev_30 <- rbind(tot_gam_dev_30, dev_table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+
+#started working in part 2 
+tot_gam_dev_30_2 <- tot_gam_dev_30[2:377,]
+
+tot_gam_dev_50_2 <- gam_supp[,3:13]
+#tot_gam_dev_50_2 <- tot_gam_dev_50_2[1:318,]
+tot_gam_dev_50_2 <- as.data.frame(tot_gam_dev_50_2)
+tot_gam_dev_30_22 <- rbind(tot_gam_dev_30_2, tot_gam_dev_50_2)
+tot_gam_dev_30_22$strong <- colnames(tot_gam_dev_30_22[2:10])[apply(tot_gam_dev_30_22[2:10],1,which.max)]
+
+specnames_50  <- read.csv("specnames_318.csv")
+specnames_50 <- specnames_50[,1:8]
+specnames_50 <- specnames_50[1:376,]
+specnames <- as.vector(specnames_50$names)
+#specnames_smaller <- read.csv("specnames_159.csv")
+
+#specnames_smaller <- as.vector(specnames_smaller$names)
+#specnames_50 <- specnames_50[specnames_50$names %in% specnames_smaller,] 
+dist_total <- read.csv("dist_total_full_400.csv")
+dist_info <- dist_total[,2:3] 
+
+
+#convex info 
+convex_1 <- read.csv("spechull/homerange_1.csv")
+convex_2 <- read.csv("spechull/homerange_2.csv")
+convex_1 <- convex_1 %>% dplyr::select(names, area, EXT_MIN_Y, EXT_MAX_Y)
+convex_2 <- convex_2 %>% dplyr::select(names, area, EXT_MIN_Y, EXT_MAX_Y)
+colnames(convex_1) <- c("names", "area_1", "min_y_1", "max_y_1")
+colnames(convex_2) <- c("names", "area_2", "min_y_2", "max_y_2")
+
+write.csv(gam_supp, "gam_supp.csv")
+write.csv(tot_gam_dev_30_2, "gam_30.csv")
+write.csv(tot_gam_dev_50_2, "gam_50.csv")
+
+gam_supp <- read.csv("gam_supp.csv")
+
+convex <- merge(convex_2, convex_1, by="names")
+convex$area_diff <- convex$area_2 - convex$area_1
+convex$min_diff <- convex$min_y_2 - convex$min_y_1
+convex$max_diff <- convex$max_y_2 - convex$max_y_1
+
+#gam_supp <- gam_supp[,2:32]
+
+
+specinfo <- left_join(specnames_50, dist_info, by=c("names"="specnames_dist"))
+specinfo <- left_join(specinfo, convex, by=c("names"))
+specinfo$dist <- specinfo$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`
+gam_supp <- left_join(tot_gam_dev_30_22, specinfo, by=c("names"))
+
+gam_supp$dist <- gam_supp$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`
+
+#adjusting specnames to exclude families 
+gam_supp<- subset(gam_supp, gam_supp$question != "family")
+#| gam_supp$question != "yes")
+
+#try combining benthic and demersal 
+gam_supp$depth_saba_2 <- ifelse(gam_supp$depth_saba == "benthic", "demersal", as.character(gam_supp$depth_saba))
+#gam_supp<- subset(gam_supp, gam_supp$depth_saba != "reef")
+
+
+
+gam_supp$strong.dev.2 <- ifelse(gam_supp$strong == "dev.sed", "substrate", ifelse(gam_supp$strong == "dev.bt", "bottemp", ifelse(gam_supp$strong == "dev.depth", "depth", ifelse(gam_supp$strong == "dev.AMO" | gam_supp$strong == "dev.NAO", "climate", ifelse(gam_supp$strong == "dev.sal", "salinity", ifelse(gam_supp$strong == "dev.sdsal" | gam_supp$strong == "dev.sdbt" | gam_supp$strong == "dev.sdsst", "variability", NA))))))
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$area_diff), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$min_diff), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$max_diff), gam_supp$depth_saba_2)
+
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$strong.dev.2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.bt), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sed), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.depth), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sal), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.NAO), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.AMO), gam_supp$depth_saba_2)
+
+library(ggsci)
+cbbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+ggplot(data=gam_supp, aes(x= strong.dev.2,  group=depth_saba_2)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") +
+    facet_wrap(~depth_saba_2) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none") + 
+  scale_fill_manual(values=cbbPalette) + 
+    ggtheme_Plot()  
+  ggsave("barplot_gam_more.jpg", plot=last_plot(), width = 20, height=8, units=c("in"), dpi=500)
+
+cbbPalette <- c("#999999", "#E69F00","#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+
+library(reshape2)
+library(ggpubr)
+
+gam_supp_2 <- gam_supp
+colnames(gam_supp_2) <- c("names", "depth", "bottemp", "salinity", "AMO", "NAO", "substrate", "variability")
+dat.m <- melt(gam_supp_2,id.vars='names', measure.vars=c('bottemp','AMO', 'NAO','depth', 'salinity', 'substrate', 'variability'))
+
+dat.m$value2 <- dat.m$value*100
+data.m <- left_join(gam_supp, dat.m, by=c("names"))
+data.m <- as.data.frame(data.m)
+ggbarplot(data.m, x="variable", y="value2", add="mean", facet.by = "depth_saba_2", fill = "variable", palette=cbbPalette, label = "value2", lab.nb.digits=2, color="variable")+
+    labs(y = "Average Deviance Explained (%)", x = "variable")+ 
+    ggtheme_Plot()  
+ggsave("barplot_gam_dev.jpg", plot=last_plot(), width = 20, height=8, units=c("in"), dpi=500)
+
+
+#all deviance explained 
+ggplot(data=data.m, aes(x=depth_saba_2, y=value, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "Deviance Explained", x = "species type") + 
+  facet_wrap(~variable) + 
+  theme_classic()
+
+#all distance 
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=dist, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "Distance shifted", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=area_diff, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "range shifted", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=min_diff, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "southern range extent shifted", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=max_diff, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "norther range extent shifted", x = "species type") + 
+  theme_classic()
+
+#dist vs deviance 
+ggplot(data.m, aes(x=dist, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+ggplot(data.m, aes(x=area_diff, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+ggplot(data.m, aes(x=min_diff, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+ggplot(data.m, aes(x=max_diff, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(dist), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "distance shifted", x = "strongest variable")+ 
+  theme_classic()
+ggsave("dist_strong.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(area_diff), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in range size", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=as.numeric(area_diff), fill=depth_saba_simp)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in range size", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=as.numeric(min_diff), fill=depth_saba_simp)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in trailing edge", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(min_diff), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in trailing edge", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=as.numeric(max_diff), fill=depth_saba_simp)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in leading edge", x = "species type")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=strong.dev.2, y=as.numeric(max_diff), fill=strong.dev.2)) + geom_boxplot() + stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE)  +
+    labs(y = "change in leading edge", x = "strongest variable")+ 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=dev.bt, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "bottom temperature (deviance explained)", x = "species type") + 
+  theme_classic()
+ggsave("dist_bt.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+ggplot(data=gam_supp, aes(x=depth_saba_2, y=dev.sed, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "substrate (deviance explained)", x = "species type") + 
+  theme_classic()
+ggsave("sub_bt.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+
+
+
+ggplot(data=gam_supp, aes(x=depth_saba, y=dist, fill=depth_saba)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "dist shifted", x = "species type") + 
+  theme_classic()
+#ggsave("spec_dist.jpg", plot=last_plot(), width = 6, height=4, units=c("in"), dpi=500)
+
+
+
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.depth, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "depth (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.geb, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "substrate (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.sal, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "sal (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.AMO, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "AMO (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.NAO, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "NAO (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data=gam_supp, aes(x=depth_saba_simp, y=dev.sdsal, fill=depth_saba_simp)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "sal variability (deviance explained)", x = "species type") + 
+  theme_classic()
+
+ggplot(data.m, aes(x=dist, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable) + labs(y = "deviance explained", x = "distance shifted")
+#this doesnt show what I am looking for in terms of bt ...
+
+ggplot(data.m, aes(x=area_diff, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable) + labs(y = "deviance explained", x = "change in range size")
+
+  
+ggplot(gam_supp, aes(x=dist, y=dev.sed)) + 
+  geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+ggplot(gam_supp, aes(x=dist, y=dev.bt)) + 
+  geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm)
+
+summary(glm(dist~dev.bt, data=gam_supp))
+summary(glm(dist~dev.depth, data=gam_supp))
+summary(glm(dist~dev.sal, data=gam_supp))
+summary(glm(dist~dev.sed, data=gam_supp))
+summary(glm(dist~dev.AMO, data=gam_supp))
+summary(glm(dist~dev.NAO, data=gam_supp))
+summary(glm(dist~dev.sdsal, data=gam_supp))
+summary(glm(dist~dev.sdbt, data=gam_supp))
+summary(glm(dist~dev.sdsst, data=gam_supp))
+
+summary(glm(area_diff~dev.bt, data=gam_supp))
+summary(glm(area_diff~dev.depth, data=gam_supp))
+summary(glm(area_diff~dev.sal, data=gam_supp))
+summary(glm(area_diff~dev.sed, data=gam_supp))
+summary(glm(area_diff~dev.AMO, data=gam_supp))
+summary(glm(area_diff~dev.NAO, data=gam_supp))
+summary(glm(area_diff~dev.sdsal, data=gam_supp))
+summary(glm(area_diff~dev.sdbt, data=gam_supp))
+summary(glm(area_diff~dev.sdsst, data=gam_supp))
+
+ggplot(data.m, aes(x=dist, y=value)) +
+    geom_point(shape=1) +    # Use hollow circles
+    geom_smooth(method=lm) + facet_grid(~variable)
+#this doesnt show what I am looking for...
+```
+
