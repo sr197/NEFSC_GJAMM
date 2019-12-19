@@ -1,0 +1,772 @@
+---
+title: "Cleaned_code"
+author: "Sarah Roberts"
+date: "12/19/2019"
+output: html_document
+---
+##packages
+This is to get at if the environment is changing or if species are changing with the environment. 
+```{r load pacakges}
+#data manip 
+library(tidyr)
+library(dplyr)
+library(naniar) #replace with NA
+
+#stats 
+library(mgcv)
+
+#spatial 
+library(sp)
+library(spatialEco)
+library(geosphere)
+library(adehabitatHR)
+library(rgdal)
+
+
+#plotting
+library(reshape2)
+library(ggpubr)
+library(ggsci)
+library(ggthemes)
+
+```
+
+#standardizing ggplot 
+```{r}
+ggtheme_Plot <- function() {
+  theme(
+    plot.title = element_text(size = rel(1), hjust = 0, face = "bold"),
+    panel.background = element_blank(),
+    strip.background = element_blank(),
+    #strip.text       = element_text(size = base_size, face = "italic"),
+    panel.border     = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.ticks = element_blank(),
+ axis.line = element_line(size = 0.5, linetype = "solid", colour = "black"),
+  axis.text.x = element_text(size = 18,
+                               angle = 0,
+                               face = "plain"),
+    axis.text.y = element_text(size = 18),
+    axis.title = element_text(size = 18),
+    legend.key = element_rect(colour = NA, fill = NA),
+    legend.position  = "left",
+    legend.title = element_text(size = 18),
+    legend.text = element_text(size = 18),
+    strip.text.x = element_text(size = 18),
+    strip.text = element_text(size = 18) 
+ 
+  )
+}
+
+```
+
+#Load data 
+```{r load data}
+
+#load data 
+fall_catch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22560_FSCSTables_Fall/22560_UNION_FSCS_SVCAT.csv")
+fall_x <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22560_FSCSTables_Fall/22560_UNION_FSCS_SVSTA.csv")
+
+spring_catch <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22561_FSCSTables_spring/22561_UNION_FSCS_SVCAT.csv")
+spring_x <- read.csv("~/Documents/ClimateOceanPlanning/Datasets/NEFSC_Bottom_Trawl/22561_FSCSTables_spring/22561_UNION_FSCS_SVSTA.csv")
+
+```
+
+```{r data manip}
+#manipulated the catch data to be in tidy format 
+fall_catch <- fall_catch %>% 
+ group_by_at(vars(-expcatchnum)) %>% # group by everything other than the value column. 
+ mutate(row_id=1:n()) %>% ungroup() %>% # build group index
+ spread(key=scientific_name, value=expcatchnum)  # spread
+
+fall_catch$id <- as.numeric(as.character(fall_catch$id))
+
+fall_catch_select <- fall_catch %>% 
+  dplyr::select(-catch_comment) %>% 
+  mutate_if(is.factor, as.integer) %>% 
+  group_by(id) %>% 
+  replace(is.na(.), 0) %>%
+ summarise_each(funs(max)) 
+
+fall_catch_select <- fall_catch_select %>% 
+  dplyr::select(-status_code, -svspp, -catchsex, -expcatchwt, -row_id)
+
+#joining the tables 
+fall_x$id <- as.numeric(as.character(fall_x$id))
+fall <- left_join(fall_catch_select, fall_x, by="id")
+fall$season <- "fall"
+
+#doing the same for spring 
+spring_catch <- spring_catch %>% 
+ group_by_at(vars(-expcatchnum)) %>% # group by everything other than the value column. 
+ mutate(row_id=1:n()) %>% ungroup() %>% # build group index
+ spread(key=scientific_name, value=expcatchnum)  # spread
+
+spring_catch$id <- as.numeric(as.character(spring_catch$id))
+
+spring_catch_select <- spring_catch %>% 
+  dplyr::select(-catch_comment) %>% 
+  mutate_if(is.factor, as.integer) %>% 
+  group_by(id) %>% 
+  replace(is.na(.), 0) %>%
+ summarise_each(funs(max)) 
+
+spring_catch_select <- spring_catch_select %>% 
+  dplyr::select(-status_code, -svspp, -catchsex, -expcatchwt, -row_id)
+
+#joining the tables 
+spring_x$id <- as.numeric(as.character(spring_x$id))
+spring <- left_join(spring_catch_select, spring_x, by="id")
+spring$season <- "spring"
+
+#combining spring and fall 
+#first lets select only the overlapping species/columns 
+cols <- intersect(colnames(spring), colnames(fall))
+total <- rbind(spring[,cols], fall[,cols])
+
+#now need to filter for the data after 1984 (this is when Batt uses it. There was a change in otter doors to allow more pelagics, and more consistent sampling of southern stratum) http://www.ices.dk/sites/pub/CM%20Doccuments/1997/Y/1997_Y33.pdf
+
+total <- total %>% 
+  filter(est_year>1984)
+total$myid <- 1:22950
+#the original id was wacky
+total_full <- total
+write.csv(total, file="total.csv")
+
+total_latlondate <- total %>% 
+  dplyr::select(myid, decdeg_beglat, decdeg_beglon, est_year, est_month)
+
+write.csv(total_latlondate, file="latlondate_total.csv")
+```
+Now I need to go back and make a few files. The first one is the NAO/AMO file which is located in the longlatdat_total xl file. Use the index function to get the NAO/AMO values by year. 
+
+The next step is to go in and copy the long lat file to arcmap and use that and the benthic habitat poly 2 shapefile along with the IDENTITY tool to get all of the information into one. 
+
+
+```{r Adding external data}
+
+#adding AMO/NAO and habitat information 
+climate_vars <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/NAO_AMO_dat.csv")
+#lets just get out the important variables (if we get them all then it adds a bunch of unneeded)
+climate_vars <- climate_vars %>% 
+  dplyr::select(-decdeg_beglat, -decdeg_beglon, -est_year, -est_month)
+hab_vars <- read.csv("~/Documents/ClimateOceanPlanning/R/NEFSC_GJAMM_GIT/habitat_dat.csv")
+
+hab_vars <- hab_vars %>% 
+  dplyr::select(-decdeg_beg, -decdeg_b_1, -est_year, -est_month)
+
+total <- read.csv("total.csv")
+
+#remove id's where NA 
+total <- total %>% 
+  filter(!is.na(id)) 
+
+total <- total %>% 
+  filter(!is.na(beglat))
+#write.csv(total, file="total.csv")
+#total <- read.csv("total.csv")
+#idk why there was a spatial NA but got rid of it in the other files and here #note this is really frustrating and can't figure out that the id columns are the same so I might just do it in excel 
+#note this id is missing spatial points 
+#201204013400080000.00
+
+
+#bind them all together 
+total <- left_join(total, climate_vars, by="myid")
+
+total <- left_join(total, hab_vars, by="myid")
+
+#getting rid of some overlapping columns 
+total <- total[, !duplicated(colnames(total))]
+
+#replacing spaces with _ in column names 
+names(total) <- gsub(" ", "_", names(total))
+
+#trimming dates 
+total <- total %>% 
+  filter(est_year>1984)
+
+#trimming so just the columns we want 
+
+xdata <- total %>% 
+ dplyr::select(myid, est_month, est_day, est_year,surftemp, surfsalin, bottemp,
+     botsalin, AMO_unsm_year, NAO_year, NAO_JFM, avgdepth,
+     LPI, SLOPE, SBF_GRP, SBFDEPTH, SEDIMENT, SBFDESED, BENHAB, decdeg_beglat, decdeg_beglon, gebco_ra_1, gebco_SD_2)
+
+#too many to do like this for ydata so will just select the columns 
+ydata <- total[,8:514]
+
+total <- cbind(ydata, xdata)
+
+
+#lets check to make sure there aren't any NA's
+
+#saving these files in case we mess up somewhere and need them again 
+write.csv(total, file="total.csv")
+write.csv(xdata, file="xdata.csv")
+write.csv(ydata, file="ydata.csv")
+
+
+```
+
+Fixing NAs and unidentified fish. Also take some time to make sure x variables have info in most of them  
+```{r}
+
+total <- read.csv("total.csv")
+ydata <- read.csv("ydata.csv")
+xdata <- read.csv("xdata.csv")
+
+total[total == -9999.000] <- NA
+xdata[xdata == -9999.000] <- NA
+
+ydata <- ydata %>% 
+  dplyr::select(-X)
+
+xdata <- xdata %>% 
+  dplyr::select(-X)
+
+xdata <- xdata %>% 
+  dplyr::rename(est_month = est_month.x, est_year = est_year.y)
+
+total <- cbind(ydata, xdata)
+
+write.csv(total, file="total.csv")
+write.csv(xdata, file="xdata.csv")
+write.csv(ydata, file="ydata.csv")
+
+```
+
+
+#checkpoint 
+do we have adataset by myID with all of the x and y data as well as a dataset with just x data and just y data? 
+#Full GAM to select species 
+#selecting based on model performance 
+```{r}
+#finding all the species
+
+#manipulated the catch data to be in tidy format 
+fall_catch$id <- as.numeric(as.character(fall_catch$id))
+
+#joining the tables 
+fall_x$id <- as.numeric(as.character(fall_x$id))
+
+fall_test <- left_join(fall_catch, fall_x, by="id")
+fall_test <- fall_test %>% dplyr:::select(id, expcatchnum, scientific_name, est_year, est_month )
+
+
+spring_catch$id <- as.numeric(as.character(spring_catch$id))
+
+#joining the tables 
+spring_x$id <- as.numeric(as.character(spring_x$id))
+
+spring_test <- left_join(spring_catch, spring_x, by="id")
+spring_test <- spring_test %>% dplyr:::select(id, expcatchnum, scientific_name, est_year, est_month )
+
+tot_test <- rbind(spring_test, fall_test)
+
+#which species are present in multiple months in both time periods
+tot_by_m <- tot_test %>% group_by(scientific_name) %>% 
+  summarise(
+  months = length(unique(est_month)))
+
+
+tot_by_m$scientific_name <- gsub(" ", ".", tot_by_m$scientific_name)
+tot_by_m$scientific_name <- gsub("\\(", ".", tot_by_m$scientific_name)
+tot_by_m$scientific_name <- gsub("\\)", ".", tot_by_m$scientific_name)
+tot_by_m$scientific_name <- gsub("\\-", ".", tot_by_m$scientific_name)
+
+write.csv(tot_by_m, file="total_months.csv")
+
+
+#running full gams with all the species
+specnames <- as.vector(tot_by_m$scientific_name)
+tot_gam_r_2 <- data.frame(matrix(ncol=3, nrow=1))
+colnames(tot_gam_r_2) <- c("names", "rsq", "dev")
+
+for (i in 1:length(specnames)) {     
+  tryCatch({#for each species in spec_list
+  fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + SED_TYPE + gebco_SD_2 + surfsalin + surftemp")), data=total, family=nb(link="log"))
+  r <- summary(fit)$r.sq
+  dev <- summary(fit)$dev.expl
+        dev_table <- list("null", r, dev)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "rsq", "dev")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_r_2 <- rbind(tot_gam_r_2, dev_table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+
+#deviance explained might be better than r - squared for non gaussian families
+  #https://m-clark.github.io/generalized-additive-models/technical.html#a-detailed-example
+
+#select species whose deviance explained is greater than 50% 
+gam_50 <- subset(tot_gam_r, tot_gam_r$dev>=.50)
+specnames_r <- as.vector(gam_50$names)
+
+#select species whose deviance explained is greater than 30% 
+
+gam_30 <- subset(tot_gam_r_2, tot_gam_r_2$dev>=.30)
+specnames_more <- as.vector(gam_30$names)
+```
+
+#individual GAMs
+```{r}
+
+#finding deviance explained by each varaible for species with total deviance explained over 30%
+
+tot_gam_dev_50 <- data.frame(matrix(ncol=12, nrow=1))
+tot_gam_dev_30 <- data.frame(matrix(ncol=19, nrow=1))
+
+colnames(tot_gam_dev_30) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.geb", "dev.sst", "dev.ssal", "dev.null", "coef.depth", "coef.bt", "coef.sal", "coef.AMO", "coef.NAO", "coef.geb", "coef.sst", "coef.ssal")
+specnames <- specnames_more
+for (i in 1:length(specnames)) { #for each species in spec_list
+  #fit <- gam(as.formula(paste(specnames[i],"~ avgdepth + bottemp + botsalin + AMO_unsm_year + NAO_year + SED_TYPE + SD3x3shortsal + SD3x3shortbt + SD3x3shortsst + gebco_SD_2")), data=total)
+#standardized <- lm.beta(fit)
+    tryCatch({
+        fit_depth <- gam(as.formula(paste(specnames[i],"~ avgdepth")), data=total, family=nb(link="log"))
+          fit_bt <- gam(as.formula(paste(specnames[i],"~ bottemp")), data=total, family=nb(link="log"))
+           fit_sal <- gam(as.formula(paste(specnames[i],"~ botsalin")), data=total, family=nb(link="log"))
+           fit_AMO <- gam(as.formula(paste(specnames[i],"~ AMO_unsm_year")), data=total, family=nb(link="log"))
+           fit_NAO <- gam(as.formula(paste(specnames[i],"~ NAO_year")), data=total, family=nb(link="log"))   
+         fit_sed <- gam(as.formula(paste(specnames[i],"~ SEDIMENT")), data=total, family=nb(link="log"))
+        fit_geb <- gam(as.formula(paste(specnames[i],"~ gebco_SD_2")), data=total, family=nb(link="log"))
+        fit_sst <- gam(as.formula(paste(specnames[i],"~ surftemp")), data=total, family=nb(link="log"))
+        fit_ssal <- gam(as.formula(paste(specnames[i],"~ surfsalin")), data=total, family=nb(link="log"))
+
+        fit_null <- gam(as.formula(paste(specnames[i],"~ 1")), data=total, family=nb(link="log"))
+        dev.depth <- summary(fit_depth)$dev.expl
+        dev.bt <- summary(fit_bt)$dev.expl
+        dev.sal <- summary(fit_sal)$dev.expl
+        dev.AMO <- summary(fit_AMO)$dev.expl
+        dev.NAO <- summary(fit_NAO)$dev.expl
+        dev.sed <- summary(fit_sed)$dev.expl
+        dev.geb <- summary(fit_geb)$dev.expl
+        dev.null <- summary(fit_null)$dev.expl
+        dev.sst <- summary(fit_sst)$dev.expl
+       dev.ssal <- summary(fit_ssal)$dev.expl
+
+        coef.depth <- summary(fit_depth)$p.coeff[2]
+        coef.bt<- summary(fit_bt)$p.coeff[2]
+        coef.sal <- summary(fit_sal)$p.coeff[2]
+        coef.AMO <- summary(fit_AMO)$p.coeff[2]
+        coef.NAO <- summary(fit_NAO)$p.coeff[2]
+        coef.geb <- summary(fit_geb)$p.coeff[2]
+        coef.sst <- summary(fit_sst)$p.coeff[2]
+        coef.ssal <- summary(fit_ssal)$p.coeff[2]
+        
+        dev_table <- list("null", dev.depth, dev.bt, dev.sal, dev.AMO, dev.NAO, dev.sed, dev.geb, dev.sst, dev.ssal, dev.null, coef.depth, coef.bt, coef.sal, coef.AMO, coef.NAO, coef.sdsal, coef.sdbt, coef.sdsst, coef.geb, coef.sst, coef.ssal)
+        dev_table <- as.data.frame(dev_table)
+        colnames(dev_table) <- c("names", "dev.depth", "dev.bt", "dev.sal", "dev.AMO", "dev.NAO", "dev.sed", "dev.geb", "dev.sst", "dev.ssal", "dev.null", "coef.depth", "coef.bt", "coef.sal", "coef.AMO", "coef.NAO", "coef.geb", "coef.sst", "coef.ssal")
+        dev_table$names <- specnames[i]
+        
+        tot_gam_dev_30 <- rbind(tot_gam_dev_30, dev_table)
+    }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+        # get coefficents of fit
+        #summary_model <- summary(fit)
+        #p <- summary_model$p.table
+        
+        
+        #cfit <- fit$coefficients
+        #cfit <- as.data.frame(cfit)
+        #cfit$names <- paste(specnames[i], rownames(cfit), sep="+")
+        #cfit$AIC <- AIC(fit)
+        #cfit$Deviance <- dev_table
+        #cfit$p_value <- p[,4]
+  
+       
+       # tot_gam_results <- rbind(tot_gam_results, cfit)
+        #tot_gam_stand <- rbind(tot_gam_stand, sfit)
+} 
+
+```
+
+
+#mean centroid shifts 
+```{r}
+total <- read.csv("total.csv")
+
+total_for_sp <- total
+names(total)<-make.names(names(total),unique = TRUE)
+
+#Lets select out the time period chunks we need. 
+total_sp_85_90 <- subset(total, est_year < 1991)
+total_sp_12_17 <- subset(total, est_year > 2011)
+
+
+coordinates(total_sp_85_90) <- ~ decdeg_beglon + decdeg_beglat
+
+coordinates(total_sp_12_17) <- ~ decdeg_beglon + decdeg_beglat
+
+
+#first 5 years 
+spec_coords_85_90 <- data.frame(name=rep(0,80), x=rep(0,80), y=rep(0,80))
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+  wt.try <- wt.centroid(total_sp_85_90, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2] 
+  spec_coords_85_90[i,] = c(name, xcord, ycord)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+#2nd 5 year chunk
+
+spec_coords_12_17 <- data.frame(name=rep(0,80), x=rep(0,80), y=rep(0,80))
+for (i in 1:length(specnames)) { #for each species in spec_list
+  tryCatch({#for each species in spec_list
+    wt.try <- wt.centroid(total_sp_12_17, specnames[i])
+  name <- specnames[i]
+  xcord <- wt.try@coords[1]
+  ycord <- wt.try@coords[2] 
+  spec_coords_12_17[i,] = c(name, xcord, ycord)
+}, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+}
+
+all_specs_2 <- cbind(spec_coords_85_90,spec_coords_12_17)
+
+colnames(spec_coords_85_90) <- c("name", "Longitude_1", "Latitude_1")
+colnames(spec_coords_12_17) <- c("name", "Longitude_2", "Latitude_2")
+
+spec_coords_85_90$Latitude_1 <- as.numeric(spec_coords_85_90$Latitude_1)
+spec_coords_85_90$Longitude_1 <- as.numeric(spec_coords_85_90$Longitude_1)
+
+spec_coords_12_17$Latitude_2 <- as.numeric(spec_coords_12_17$Latitude_2)
+spec_coords_12_17$Longitude_2 <- as.numeric(spec_coords_12_17$Longitude_2)
+
+
+#this calculates the geodesic distance between the two points
+
+#for 5 year chunks
+dist_total_5yr <- as.data.frame(distGeo(spec_coords_85_90[2:3], spec_coords_12_17[2:3]))
+dist_total_5yr <- cbind(specnames, dist_total_5yr)
+dist_total_5yr <- cbind(dist_total_5yr, spec_coords_85_90)
+dist_total_5yr <- cbind(dist_total_5yr, spec_coords_12_17)
+
+write.csv(dist_total_5yr, "dist_total_5yr_3.csv")
+
+#lets save all of the mean centroid coordinates to map later
+#write.csv(spec_coords_85_90, "spec_coords_85_90_2.csv")
+#write.csv(spec_coords_12_17, "spec_coords_12_17_2.csv")
+
+dist_total_5yr$dist <- dist_total_5yr$`distGeo(spec_coords_85_90[2:3], spec_coords_12_17[2:3])`
+dist_total_5yr <- subset(dist_total_5yr, dist_total_5yr$Longitude_1 != 0)
+
+dist_total_5yr <- subset(dist_total_5yr, dist_total_5yr$Longitude_2 != 0)
+write.csv(dist_total_5yr, "dist_total_5yr_3.csv")
+
+```
+
+#convex hull 
+
+```{r}
+total_big <- rbind(fall, spring)
+total_big_1 <- as.data.frame(total_big)
+total_big_1 <- subset(total_big_1, total_big_1$est_year >= 1984)
+
+total_big_1 <- total_big_1 %>% 
+  dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
+  rename(ID=scientific_name)
+
+
+#check if any specs have less than 5 relocations using dplyr
+total_big_1 <- subset(total_big_1, ID %in% names(which(table(ID) >= 5))) 
+total_big_1$ID <- factor(total_big_1$ID)
+
+#make a spatial object
+total_big_sp <- total_big_1 %>% drop_na()
+coordinates(total_big_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+spec_hull_tot <- mcp(total_big_sp[,1], percent=95)
+spec_hull_tot_area <- as.data.frame(spec_hull_tot[])
+
+
+#now for two time chunks
+total_big <- rbind(fall, spring)
+total_big_1 <- as.data.frame(total_big)
+total_big_1 <- subset(total_big_1, total_big_1$est_year >= 1984)
+
+total_big_first <- subset(total_big_1, est_year < 1991)
+total_big_second <- subset(total_big_1, est_year > 2011)
+
+#first
+total_big_first <- total_big_first %>% 
+  dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
+  rename(ID=scientific_name)
+
+
+#check if any specs have less than 5 relocations using dplyr
+total_big_first <- subset(total_big_first, ID %in% names(which(table(ID) >= 5)))
+total_big_first$ID <- factor(total_big_first$ID)
+
+#make a spatial object
+total_big_first_sp <- total_big_first %>% drop_na()
+coordinates(total_big_first_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+
+spec_hull_first <- mcp(total_big_first_sp[,1], percent=95)
+spec_hull_first_area <- as.data.frame(spec_hull_first[])
+plot(spec_hull_first)
+
+#second
+total_big_second <- total_big_second %>% 
+  dplyr::select(scientific_name, decdeg_beglon, decdeg_beglat) %>% 
+  rename(ID=scientific_name)
+
+
+#check if any specs have less than 5 relocations using dplyr
+total_big_second <- subset(total_big_second, ID %in% names(which(table(ID) >= 5)))
+total_big_second$ID <- factor(total_big_second$ID)
+
+#make a spatial object
+total_big_second_sp <- total_big_second %>% drop_na()
+coordinates(total_big_second_sp) <- ~ decdeg_beglon + decdeg_beglat
+
+
+spec_hull_second <- mcp(total_big_second_sp[,1], percent=95)
+spec_hull_second_area <- as.data.frame(spec_hull_second[])
+plot(spec_hull_first)
+plot(spec_hull_second)
+
+write.csv(spec_hull_first_area, file="spec_hull_first5yr_area.csv")
+write.csv(spec_hull_second_area, file="spec_hull_second5yr_area.csv")
+
+#write these out to shapefiles
+writeOGR(spec_hull_first, layer= "homerange_1_5yr", driver="ESRI Shapefile", dsn="spechull")
+writeOGR(spec_hull_second, layer= "homerange_2_5yr", driver="ESRI Shapefile", dsn="spechull")
+
+#go into r arcmap and use the add geometry attributes units to find min and max lat 
+
+```
+
+#combining spatial and gam data 
+```{r}
+tot_gam_dev_30 <- tot_gam_dev_30[2:377,]
+
+tot_gam_dev_30$strong <- colnames(tot_gam_dev_30[2:13])[apply(tot_gam_dev_30[2:13],1,which.max)]
+
+#info with species type 
+specnames_30  <- read.csv("specnames_318.csv")
+specnames_30 <- specnames_30[,1:9]
+specnames_30 <- specnames_30[1:376,]
+specnames_30 <- left_join(tot_gam_r_2, specnames_30, by=c("names"))
+
+specnames_30 <- subset(specnames_30, specnames_30$dev >=.3)
+
+#add distance info 
+dist_total <- read.csv("dist_total_full_400.csv")
+dist_info <- dist_total[,2:3] 
+dist_info$dist_15yr <- dist_info$distGeo.spec_coords_1.2.3...spec_coords_2.2.3..
+dist_info_5yr <- dist_total_5yr
+dist_info_5yr$dist_5yr <- dist_info_5yr$dist
+dist_info_5yr <- dist_info_5yr %>% dplyr::select(specnames, dist_5yr)
+
+tot_gam_dev_30$sum_dev <- rowSums(tot_gam_dev_30[,2:13])
+
+#convex info 
+convex_1 <- read.csv("spechull/homerange_1.csv")
+convex_2 <- read.csv("spechull/homerange_2.csv")
+convex_1 <- convex_1 %>% dplyr::select(id, names, area, EXT_MIN_Y, EXT_MAX_Y)
+convex_2 <- convex_2 %>% dplyr::select(id, names, area, EXT_MIN_Y, EXT_MAX_Y)
+colnames(convex_1) <- c("id", "names", "area_1", "min_y_1", "max_y_1")
+colnames(convex_2) <- c("id", "names", "area_2", "min_y_2", "max_y_2")
+convex1 <- merge(convex_2, convex_1, by="names")
+convex1$area_diff <- convex1$area_2 - convex1$area_1
+convex1$min_diff <- convex1$min_y_2 - convex$min_y_1
+convex1$max_diff <- convex1$max_y_2 - convex1$max_y_1
+
+convex_1_5 <- read.csv("homerange_1_5yr.csv")
+convex_2_5 <- read.csv("homerange_2_5yr.csv")
+convex_1_5 <- convex_1_5 %>% dplyr::select(id, area, EXT_MIN_Y, EXT_MAX_Y)
+convex_2_5 <- convex_2_5 %>% dplyr::select(id, area, EXT_MIN_Y, EXT_MAX_Y)
+colnames(convex_1_5) <- c("names", "area_1", "min_y_1", "max_y_1")
+colnames(convex_2_5) <- c("names", "area_2", "min_y_2", "max_y_2")
+convex <- merge(convex_2_5, convex_1_5, by="names")
+convex$area_diff_5yr <- convex$area_2 - convex$area_1
+convex$min_diff_5yr <- convex$min_y_2 - convex$min_y_1
+convex$max_diff_5yr <- convex$max_y_2 - convex$max_y_1
+
+convex <- left_join(convex1, convex, by=c("id.x"="names"))
+
+specinfo <- left_join(specnames_30, dist_info, by=c("names"="specnames_dist"))
+specinfo <- left_join(specinfo, dist_info_5yr, by=c("names"="specnames"))
+specinfo <- left_join(specinfo, convex, by=c("names"))
+#specinfo$dist <- specinfo$`distGeo(spec_coords_1[2:3], spec_coords_2[2:3])`
+gam_supp <- left_join(tot_gam_dev_30, specinfo, by=c("names"))
+
+#gam_supp$dist <- gam_supp$distGeo.spec_coords_1.2.3...spec_coords_2.2.3..
+gam_supp_orig <- gam_supp
+write.csv(gam_supp_orig, "gam_supp.csv")
+
+#adjusting specnames to exclude families and only include fish (can exclude elasmobranchs and only do teleosts too) Could just do phylum chordata which is all fish and sharks and rays but not octopods, mollusks, gastropods, or cephalopods)
+gam_supp<- subset(gam_supp, gam_supp$question != "family")
+#gam_supp<- subset(gam_supp, gam_supp$question != "yes")
+gam_supp<- subset(gam_supp, gam_supp$fish_type == "fish" |  gam_supp$fish_type == "elasmobranch")
+#| gam_supp$question != "yes")
+
+#try combining benthic and demersal 
+gam_supp$depth_saba_2 <- ifelse(gam_supp$depth_saba == "benthic", "demersal", as.character(gam_supp$depth_saba))
+#gam_supp<- subset(gam_supp, gam_supp$depth_saba != "reef")
+
+gam_supp$strong.dev.2 <- ifelse(gam_supp$strong == "dev.sed", "substrate", ifelse(gam_supp$strong == "dev.bt", "bottemp", ifelse(gam_supp$strong == "dev.depth", "depth", ifelse(gam_supp$strong == "dev.AMO" | gam_supp$strong == "dev.NAO", "climate", ifelse(gam_supp$strong == "dev.sal", "salinity", ifelse(gam_supp$strong == "dev.sdsal", "sal variability", ifelse(gam_supp$strong=="dev.sdsst", "sst variability", ifelse(gam_supp$strong=="dev.sst", "sst", ifelse(gam_supp$strong=="dev.ssal", "ssal", ifelse(gam_supp$strong=="dev.geb", "rugosity", NA))))))))))
+
+gam_supp <- gam_supp %>% dplyr::select(-dev.null)
+#gam_supp <- subset(gam_supp, gam_supp$names !="Hypleurochilus.geminatus..crested.blenny.")
+gam_supp_3 <- gam_supp[1:285,]
+gam_supp_orig <- gam_supp
+write.csv(gam_supp_5yr, "gam_supp_5yrcurrent.csv")
+
+
+gam_supp <- gam_supp_orig
+gam_supp_5yr <- subset(gam_supp, (!is.na(gam_supp$dist_5yr)))
+
+#without variability 
+gam_supp_5yr <- gam_supp_5yr %>%  dplyr::select(-strong, -dev.AMO, -dev.NAO, -dev.sdbt, -dev.sdsal, -dev.sdsst)
+gam_supp_5yr$strong <- colnames(gam_supp_5yr[2:8])[apply(gam_supp_5yr[2:8],1,which.max)]
+
+gam_supp_5yr$strong.dev.2 <- ifelse(gam_supp_5yr$strong == "dev.sed", "substrate", ifelse(gam_supp_5yr$strong == "dev.bt", "bottom temperature", ifelse(gam_supp_5yr$strong == "dev.depth", "depth", ifelse(gam_supp_5yr$strong == "dev.sal", "bottom salinity", ifelse(gam_supp_5yr$strong=="dev.sst", "surface temperature", ifelse(gam_supp_5yr$strong=="dev.ssal", "surface salinity", ifelse(gam_supp_5yr$strong=="dev.geb", "rugosity", NA)))))))
+```
+
+```{r}
+gam_supp_5yr <- read.csv("gam_supp_5yrcurrent.csv")
+```
+
+#statistics 
+```{r}
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist_5yr), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dist_15yr), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$area_diff_5yr), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$min_diff_5yr), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$max_diff_5yr), gam_supp$depth_saba_2)
+
+
+pairwise.wilcox.test(as.numeric(gam_supp$area_diff), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$min_diff), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$max_diff), gam_supp$depth_saba_2)
+
+
+pairwise.wilcox.test(as.numeric(gam_supp$dist), gam_supp$strong.dev.2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.bt), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sed), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.depth), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.sal), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.NAO), gam_supp$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp$dev.AMO), gam_supp$depth_saba_2)
+
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dist), gam_supp_5yr$strong.dev.2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.bt), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sed), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.depth), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.geb), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sal), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.NAO), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.AMO), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sst), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sdsal), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sdsst), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.sdbt), gam_supp_5yr$depth_saba_2)
+pairwise.wilcox.test(as.numeric(gam_supp_5yr$dev.ssal), gam_supp_5yr$depth_saba_2)
+
+
+```
+
+#plots
+
+```{r}
+
+cbbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+ggplot(data=gam_supp_5yr, aes(x= strong.dev.2,  group=depth_saba_2)) + 
+    geom_bar(aes(y = ..prop.., fill = factor(..x..)), stat="count") +
+    geom_text(aes( label = scales::percent(..prop..),
+                   y= ..prop.. ), stat= "count", vjust = -.5) +
+    labs(y = "Percent", x = "strongest variable", fill="strog_2") + 
+  coord_flip() +
+    facet_wrap(~depth_saba_2) +
+    scale_y_continuous(labels = scales::percent) + theme(legend.position = "none")  +
+    ggtheme_Plot()  
+  ggsave("barplot_gam_more.jpg", plot=last_plot(), width = 20, height=8, units=c("in"), dpi=500)
+
+cbbPalette <- c("#999999", "#E69F00","#E69F00", "#56B4E9", "#009E73", "#D55E00", "#0072B2", "#CC79A7")
+
+
+
+gam_supp_2 <- gam_supp_5yr
+colnames(gam_supp_2) <- c("names", "depth", "bottom temperature", "bottom salinity", "substrate", 'rugosity', 'surface temperature', 'surface salinity')
+
+dat.m <- melt(gam_supp_2,id.vars='names', measure.vars=c("depth", "substrate", 'surface temperature',"bottom temperature",  "bottom salinity", 'surface salinity'))
+levels(dat.m$variable) <- gsub(" ", "\n", levels(dat.m$variable))
+
+dat.m$value2 <- dat.m$value*100
+data.m <- left_join(gam_supp_5yr, dat.m, by=c("names"))
+data.m <- as.data.frame(data.m)
+ggbarplot(data.m, x="variable", y="value2", add="mean", facet.by = "depth_saba_2", fill = "variable", label = "value2", lab.nb.digits=1, color="variable", orientation = "horiz", lab.size = 8, lab.hjust=1, xlim=c(0,100)) +
+    labs(y = "Average Deviance explained (%)", x = "Variable")+ 
+ theme_classic(base_size=22) +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1)), 
+        strip.text = element_text(size = rel(1)), 
+        plot.margin = margin(2, 2, 2, 2, "cm")) + scale_fill_simpsons() + scale_color_simpsons() +
+  theme(legend.position = "none") +
+  ggsave(path = "figs", filename= "bar_deviance_by_spec_var.jpg", plot=last_plot(), width = 20, height=10, units=c("in"), dpi=500)
+
+
+my_comparisons <- list( c("pelagic", "reef"), c("demersal", "reef"), c("demersal", "pelagic"))
+
+
+
+#all deviance explained 
+ggplot(data=data.m, aes(x=depth_saba_2, y=value, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "Deviance explained (%)", x = "Species type") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test", label = "p.format", size=7) + labs(fill = "Species Type") + 
+  facet_wrap(~variable) + 
+ theme_classic(base_size=22) +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1)), 
+        strip.text = element_text(size = rel(1)), 
+        panel.spacing = unit(1, "cm")) + 
+  theme(legend.position = "none") + scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9")) +
+  ggsave(path = "figs", filename= "deviance_by_spec_var.jpg", plot=last_plot(), width = 20, height=18, units=c("in"), dpi=500)
+
+
+#all distance 
+gam_supp_5yr$area_diff_5yr_m <- gam_supp_5yr$area_diff_5yr*10000 #was in hectares
+gam_supp_5yr$centroid_shift_km <- gam_supp_5yr$dist_5yr/1000 #was in meters
+gam_supp_3 <- gam_supp_5yr %>% dplyr::select(names, centroid_shift_km, area_diff_5yr_m, min_diff_5yr, max_diff_5yr)
+colnames(gam_supp_3) <- c("names", "Mean centroid shift (km)", "Range size change (meters squared)", "Southern range shifted (latitude)", "Northern range shifted (latitude)")
+
+dat.m.2 <- melt(gam_supp_3,id.vars='names', measure.vars=c("Mean centroid shift (km)", "Range size change (meters squared)", "Southern range shifted (latitude)", "Northern range shifted (latitude)"))
+
+data.m.2 <- left_join(gam_supp_5yr, dat.m.2, by=c("names"))
+data.m.2 <- as.data.frame(data.m.2)
+
+ggplot(data=data.m.2, aes(x=depth_saba_2, y=value, fill=depth_saba_2)) + geom_boxplot() +
+  stat_summary(fun.y=mean, colour="darkred", geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+    labs(y = "", x = "Species type") + stat_compare_means(comparisons = my_comparisons, method="wilcox.test", label = "p.format", size=7) + labs(fill = "Species Type") + 
+  facet_wrap(~variable, scales = "free") + 
+ theme_classic(base_size=22) +
+  theme(axis.title = element_text(size = rel(1.5)),
+        axis.text = element_text(size = rel(1)), 
+        strip.text = element_text(size = rel(1)), 
+        panel.spacing = unit(1, "cm")) + 
+  theme(legend.position = "none") + scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9")) + 
+  ggsave(path = "figs", filename= "distance_by_spec_var.jpg", plot=last_plot(), width = 20, height=20, units=c("in"), dpi=500)
+```
+
